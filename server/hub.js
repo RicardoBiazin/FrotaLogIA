@@ -21,6 +21,8 @@ const AUTH_TIMEOUT_MS = 10_000;
 
 export function createHub({ server, store, viagens, eventos, estoque, tenants, batchMs = 250 }) {
   const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 16 * 1024 });
+  // O ws repete aqui os erros do servidor HTTP (ex.: porta ocupada); quem os trata é o index.js.
+  wss.on('error', () => {});
   // cliente → { assets: Map<id, asset>, viagens: Map<id, viagem>, estoque: Map<cd|endereco, item> }
   const pending = new Map();
 

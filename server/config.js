@@ -29,8 +29,8 @@ export const config = {
   apiKey,
   // Clientes e suas chaves (ver server/tenants.js). Ausente = só o cliente "demo".
   clientesFile: path.resolve(ROOT, process.env.CLIENTES_FILE || 'data/clientes.json'),
-  // Cliente que recebe os dados do simulador.
-  simCliente: process.env.SIM_CLIENTE || 'demo',
+  // Cliente que recebe os dados do simulador. Vazio: "demo" ou o primeiro com a rede de exemplo.
+  simCliente: process.env.SIM_CLIENTE || '',
   simulate: (process.env.SIMULATE ?? 'true').toLowerCase() !== 'false',
   simSpeedup: Math.max(0.1, num(process.env.SIM_SPEEDUP, 5)),
   osrmUrl: (process.env.OSRM_URL || 'https://router.project-osrm.org').replace(/\/$/, ''),

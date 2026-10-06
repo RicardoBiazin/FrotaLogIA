@@ -1,2 +1,5 @@
 * text=auto eol=lf
 *.png binary
+# O cmd do Windows se perde em .bat com LF (rótulos e goto)
+*.bat text eol=crlf
+*.cmd text eol=crlf

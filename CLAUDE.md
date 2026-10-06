@@ -19,11 +19,14 @@ Usuário final: operadores de logística/frota.
 ```bash
 npm install
 npm run dev     # node --watch server/index.js  → http://localhost:3000
-npm test        # node --test (74 testes; devem passar sempre)
+npm test        # node --test (75 testes; devem passar sempre)
+npm run dados-teste [-- CHAVE]   # manda veículo, viagem e palete de teste pela API e confere
 npm run licencas  # regenera THIRD_PARTY_NOTICES.md e barra licença copyleft
 npm run cliente -- <id> "<nome>" [--demo]   # cria cliente em data/clientes.json e mostra a chave uma vez
 npm run device  # simula um dispositivo externo enviando posições por HTTP
 ```
+
+No Windows, `FrotaLogIA.bat` faz tudo por menu (aceita a opção como argumento: `FrotaLogIA.bat 4`; `NO_BROWSER=1` não abre o navegador). Ele **precisa de CRLF** (`.gitattributes`); `chcp`, `npm` e `node` rodam com `<nul`, senão engolem a resposta digitada no `set /p` seguinte; checagens de saúde usam `127.0.0.1`, porque `localhost` tenta antes o IPv6 e estoura o tempo. Mexeu no `.bat`: teste as opções com entrada redirecionada de arquivo.
 
 Node >= 20.12. **Não adicione dependências nativas** (precisam compilar no Windows).
 
@@ -46,7 +49,7 @@ fonte (HTTP / adaptador / simulador)
 - Clientes vêm de `data/clientes.json` (ignorado no git; só o **hash** SHA-256 da chave). Sem o arquivo existe só o `demo`: com `API_KEY` a chave dele é essa; sem, o acesso é aberto e o servidor escuta só em 127.0.0.1.
 - **Todo dado entra por `createIngest`** (`server/ingest.js`): `position` e `trip`. Adaptadores e o simulador também. Não grave direto nos stores a partir de rotas ou adaptadores.
 - `store.js` e `viagens.js` são os pontos de troca para persistência (mesma interface + eventos `update`/`remove`).
-- O simulador (`server/sim/`) gera posições **e viagens** (cada ida/volta da rota é uma viagem) para `SIM_CLIENTE`; desligue com `SIMULATE=false`.
+- O simulador (`server/sim/`) gera posições **e viagens** (cada ida/volta da rota é uma viagem) para `SIM_CLIENTE` (vazio: o `demo` ou o primeiro cliente com `"centros": "demo"`); desligue com `SIMULATE=false`.
 - Mensagens WS (servidor → navegador): `snapshot` (com `cliente`, `assets`, `viagens` ativas e `eventos`), `batch` (`assets` + `viagens`), `remove`, `evento`. Chave recusada fecha com 4401. Ver `server/hub.js`.
 
 ## Contrato de dados (invariantes)

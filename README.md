@@ -14,6 +14,23 @@ Logística de transporte em tempo real, **por cliente**: cada empresa vê a pró
 
 Requisitos: **Node.js 20.12 ou superior**.
 
+### No Windows: `FrotaLogIA.bat`
+
+Dê dois cliques em `FrotaLogIA.bat`. A opção 1 (padrão, basta apertar Enter) faz todo o processo: confere o Node, instala as dependências, roda os testes, sobe o servidor e abre o navegador quando ele estiver pronto. Se o FrotaLogIA já estiver rodando, só abre o navegador.
+
+| Opção | O que faz |
+|---|---|
+| 1 | Iniciar (instala, testa, sobe e abre o navegador) |
+| 2 | Iniciar com o simulador 20x mais rápido (os caminhões chegam logo aos CDs) |
+| 3 | Criar cliente e chave de acesso (com o mesmo id, troca a chave) |
+| 4 | Rodar os testes automáticos |
+| 5 | Enviar dados de teste pela API, com o servidor ligado (`npm run dados-teste`) |
+| 6 | Voltar ao modo demonstração (apaga `data\clientes.json`) |
+
+Também aceita a opção direto: `FrotaLogIA.bat 4`.
+
+### Em qualquer sistema
+
 ```bash
 npm install
 npm run dev        # servidor com reinício automático
@@ -22,7 +39,7 @@ npm run dev        # servidor com reinício automático
 
 Sem configuração, o app roda com o cliente **demo**, sem chave, e o servidor só aceita acesso desta máquina (127.0.0.1). Na primeira execução, o simulador busca o traçado real das ruas no OSRM e guarda em `.cache/routes.json`. Se o OSRM estiver inacessível, ele usa linhas retas.
 
-Outros comandos: `npm start` (sem reinício automático), `npm test` (testes) e `npm run device` (simula um rastreador externo).
+Outros comandos: `npm start` (sem reinício automático), `npm test` (testes), `npm run device` (simula um rastreador externo) e `npm run dados-teste` (manda um veículo, uma viagem e um palete de teste pela API e confere as respostas).
 
 ## Clientes e chaves de acesso
 
@@ -175,7 +192,7 @@ Copie `.env.example` para `.env`. Todas as variáveis são opcionais.
 | `CLIENTES_FILE` | `data/clientes.json` | Clientes, chaves (hash) e CDs. |
 | `API_KEY` | vazio | Sem `clientes.json`, é a chave do cliente demo. Vazio = acesso aberto (só desenvolvimento). |
 | `SIMULATE` | `true` | Liga o simulador. Desligue ao usar dados reais. |
-| `SIM_CLIENTE` | `demo` | Cliente que recebe os dados simulados. |
+| `SIM_CLIENTE` | automático | Cliente que recebe os dados simulados. Vazio: o `demo` ou, sem ele, o primeiro cliente criado com `--demo`. |
 | `SIM_SPEEDUP` | `5` | Aceleração do tempo nas rotas (1 = tempo real). |
 | `OSRM_URL` | servidor público | O público serve só para demonstração. |
 | `MAP_STYLE_URL` | vazio | `style.json` do MapLibre. Vazio usa o Positron do [OpenFreeMap](https://openfreemap.org). |
@@ -210,8 +227,9 @@ public/
   js/estoque.js     endereços, ocupação e validade (código puro, também usado pelo servidor)
   js/interp.js      interpolação do movimento (código puro, testado)
   js/geoView.js     mapa (MapLibre)    js/indoorView.js  planta do CD (canvas)
-test/             74 testes (node --test)
-scripts/          novo-cliente.js, fake-device.js, licencas.js
+test/             75 testes (node --test)
+scripts/          novo-cliente.js, dados-teste.js, fake-device.js, licencas.js
+FrotaLogIA.bat    menu do Windows: instala, testa, inicia, cria cliente
 ```
 
 ## Antes de ir para produção

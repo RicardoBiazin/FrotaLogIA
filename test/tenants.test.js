@@ -39,6 +39,19 @@ test('"centros": "demo" usa a rede de exemplo', () => {
   assert.equal(t.get('demo').centros[0].id, 'cd-1');
 });
 
+test('simulador: SIM_CLIENTE, senão "demo", senão o primeiro com a rede de exemplo', () => {
+  const t = parseTenants([
+    { id: 'acme', chaveSha256: hex('a') },
+    { id: 'beta', chaveSha256: hex('b'), centros: 'demo' },
+    { id: 'gama', chaveSha256: hex('c'), centros: 'demo' },
+  ], { demoCentros: [CD] });
+  assert.equal(t.simulado('').id, 'beta');
+  assert.equal(t.simulado('acme').id, 'acme');
+  assert.equal(t.simulado('nao-existe'), null);
+  assert.equal(parseTenants([{ id: 'acme', chaveSha256: hex('a') }]).simulado(''), null);
+  assert.equal(loadTenants({ file: 'nao-existe.json' }).simulado('').id, 'demo');
+});
+
 test('sem arquivo: cliente demo aberto sem API_KEY e fechado com ela', () => {
   const file = path.join(os.tmpdir(), 'nao-existe-frotalogia.json');
   const aberto = loadTenants({ file, apiKey: '' });

@@ -37,6 +37,16 @@ const hub = createHub({ server, store, viagens, eventos, estoque, tenants, batch
 const sweepTimer = setInterval(() => store.sweep(), 5_000);
 let simulation = null;
 
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`A porta ${config.port} já está em uso: o FrotaLogIA já está rodando ou outro programa usa essa porta.`);
+    console.error(`Feche o outro programa ou escolha outra porta com PORT no .env.`);
+  } else {
+    console.error(`Não foi possível iniciar o servidor: ${err.message}`);
+  }
+  process.exit(1);
+});
+
 // Acesso aberto (sem chave) só nesta máquina; com chave, em todas as interfaces.
 const host = config.host || (tenants.open ? '127.0.0.1' : '0.0.0.0');
 
@@ -50,11 +60,16 @@ server.listen(config.port, host, () => {
     }
   }
   if (config.simulate) {
-    if (!tenants.get(config.simCliente)) {
-      console.warn(`[sim] cliente "${config.simCliente}" não existe; simulador desligado (ver SIM_CLIENTE).`);
+    const sim = tenants.simulado(config.simCliente);
+    if (!sim) {
+      console.warn(
+        config.simCliente
+          ? `[sim] cliente "${config.simCliente}" não existe; simulador desligado (ver SIM_CLIENTE).`
+          : '[sim] nenhum cliente com a rede de exemplo; simulador desligado (ver SIM_CLIENTE).',
+      );
       return;
     }
-    startSimulation({ ingest, config, cliente: config.simCliente, centros: tenants.get(config.simCliente).centros })
+    startSimulation({ ingest, config, cliente: sim.id, centros: sim.centros })
       .then((sim) => {
         simulation = sim;
       })

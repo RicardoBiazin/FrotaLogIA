@@ -29,6 +29,15 @@ export class Tenants {
     return this.byId.get(id) ?? null;
   }
 
+  /**
+   * Cliente que recebe os dados do simulador: o pedido (SIM_CLIENTE) ou, sem pedido,
+   * o "demo" e, na falta dele, o primeiro cliente criado com a rede de exemplo.
+   */
+  simulado(pedido) {
+    if (pedido) return this.get(pedido);
+    return this.get('demo') ?? this.list.find((t) => t.centrosDemo) ?? null;
+  }
+
   /** Cliente dono da chave, ou null. Compara todos os hashes em tempo constante. */
   resolve(key) {
     if (this.open) return this.list[0];
@@ -71,6 +80,7 @@ export function parseTenants(data, { file = 'clientes.json', demoCentros = [] } 
       nome: String(raw.nome ?? id).trim().slice(0, 80) || id,
       chaveSha256: Buffer.from(hash, 'hex'),
       centros,
+      centrosDemo: raw.centros === 'demo', // rede de exemplo: o simulador pode alimentá-la
     };
   });
   return new Tenants(list);
@@ -92,6 +102,7 @@ export function loadTenants({ file, apiKey = '', demoCentros = [] }) {
     nome: 'Demonstração',
     chaveSha256: apiKey ? sha256(apiKey) : null,
     centros: demoCentros,
+    centrosDemo: true,
   };
   return new Tenants([demo], { open: !apiKey });
 }
