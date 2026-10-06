@@ -1,7 +1,7 @@
 {
   "name": "frotalogia",
-  "version": "0.3.1",
-  "description": "Rastreamento de frota e logística de transporte em tempo real: veículos, viagens e centros de distribuição, por cliente.",
+  "version": "0.4.0",
+  "description": "Logística de transporte em tempo real, por cliente: veículos, viagens, centros de distribuição e estoque nas prateleiras.",
   "author": "Ricardo Biazin",
   "license": "UNLICENSED",
   "private": true,

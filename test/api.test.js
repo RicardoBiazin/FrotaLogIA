@@ -5,6 +5,7 @@ import WebSocket from 'ws';
 import { AssetStore } from '../server/store.js';
 import { ViagemStore } from '../server/viagens.js';
 import { EventLog } from '../server/eventos.js';
+import { EstoqueStore } from '../server/estoque.js';
 import { parseTenants, sha256 } from '../server/tenants.js';
 import { createIngest } from '../server/ingest.js';
 import { createApp } from '../server/app.js';
@@ -16,7 +17,10 @@ let base;
 let store;
 const config = { mapStyleUrl: '', mapCenter: [0, 0], mapZoom: 5, offlineAfterMs: 60_000 };
 const hex = (k) => sha256(k).toString('hex');
-const CD = { id: 'cd-1', nome: 'CD Teste', lat: -27.6, lon: -48.6, raioM: 300, planta: { largura: 20, altura: 10 } };
+const CD = {
+  id: 'cd-1', nome: 'CD Teste', lat: -27.6, lon: -48.6, raioM: 300,
+  planta: { largura: 20, altura: 10, prateleiras: [{ id: 'A', x: 2, y: 4, w: 16, h: 2, posicoes: 4, niveis: 3 }] },
+};
 
 before(async () => {
   const tenants = parseTenants([
@@ -26,10 +30,11 @@ before(async () => {
   store = new AssetStore();
   const viagens = new ViagemStore();
   const eventos = new EventLog();
-  const ingest = createIngest({ store, viagens, eventos, tenants });
-  const app = createApp({ config, store, viagens, eventos, ingest, tenants, version: '9.9.9' });
+  const estoque = new EstoqueStore();
+  const ingest = createIngest({ store, viagens, eventos, estoque, tenants });
+  const app = createApp({ config, store, viagens, eventos, estoque, ingest, tenants, version: '9.9.9' });
   server = http.createServer(app);
-  hub = createHub({ server, store, viagens, eventos, tenants, batchMs: 50 });
+  hub = createHub({ server, store, viagens, eventos, estoque, tenants, batchMs: 50 });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -136,6 +141,47 @@ test('centros trazem a planta no formato da tela', async () => {
   assert.deepEqual(await (await get('/api/centros', B)).json(), []);
 });
 
+const palete = (over = {}) => ({
+  cd: 'cd-1', endereco: 'A-02-1', sku: 'BEB-3001', descricao: 'Cerveja lata 350 ml',
+  depositante: 'Atacado Serra Mar', quantidade: 90, unidade: 'cx', lote: 'L1', validade: '2027-01-01',
+  ...over,
+});
+
+test('estoque: grava no endereço, valida contra a planta e libera com quantidade 0', async () => {
+  const res = await post('/api/estoque', [
+    palete(),
+    palete({ endereco: 'a-3-2', sku: 'ALI-1', descricao: 'Arroz' }), // minúscula e sem zero: normaliza
+    palete({ endereco: 'B-01-1' }),
+    palete({ endereco: 'A-05-1' }),
+    palete({ endereco: 'A-01-4' }),
+    palete({ cd: 'nao-existe' }),
+    palete({ endereco: 'A-01-1', sku: '' }),
+  ], A);
+  const body = await res.json();
+  assert.equal(body.accepted, 2);
+  assert.deepEqual(body.rejected.map((r) => r.index), [2, 3, 4, 5, 6]);
+  assert.match(body.rejected[0].erro, /rua B não existe/);
+  assert.match(body.rejected[1].erro, /posições de 1 a 4/);
+  assert.match(body.rejected[2].erro, /níveis de 1 a 3/);
+
+  const itens = await (await get('/api/centros/cd-1/estoque', A)).json();
+  assert.deepEqual(itens.map((i) => i.endereco).sort(), ['A-02-1', 'A-03-2']);
+  assert.equal(itens.find((i) => i.endereco === 'A-02-1').validade, Date.parse('2027-01-01'));
+
+  await post('/api/estoque', { cd: 'cd-1', endereco: 'A-03-2', quantidade: 0 }, A);
+  assert.equal((await (await get('/api/centros/cd-1/estoque', A)).json()).length, 1);
+});
+
+test('estoque: busca de produto e isolamento por cliente', async () => {
+  const achados = await (await get('/api/estoque?q=cerveja', A)).json();
+  assert.deepEqual(achados.map((i) => `${i.cd} ${i.endereco}`), ['cd-1 A-02-1']);
+  assert.equal((await get('/api/estoque', A)).status, 400);
+  assert.deepEqual(await (await get('/api/estoque?q=cerveja', B)).json(), []);
+  assert.equal((await get('/api/centros/cd-1/estoque', B)).status, 404);
+  const res = await post('/api/estoque', palete(), B); // beta não tem esse CD
+  assert.match((await res.json()).rejected[0].erro, /não existe para este cliente/);
+});
+
 test('JSON inválido responde 400', async () => {
   const res = await post('/api/positions', '{quebrado', A);
   assert.equal(res.status, 400);
@@ -225,6 +271,9 @@ test('WebSocket: snapshot e lotes só do próprio cliente', async () => {
   await post('/api/positions', { id: 'SO-ALFA', lat: -27, lon: -48 }, A);
   const batch = await alfa.next((m) => m.type === 'batch' && m.assets.some((a) => a.id === 'SO-ALFA'));
   assert.ok(batch);
+  await post('/api/estoque', palete({ endereco: 'A-04-3', sku: 'X-9' }), A);
+  const lote = await alfa.next((m) => m.type === 'batch' && m.estoque?.some((i) => i.endereco === 'A-04-3'));
+  assert.equal(lote.estoque.find((i) => i.endereco === 'A-04-3').cd, 'cd-1');
   // beta não pode receber lote nenhum (espera o timeout de 2 s do next)
   const vazou = await beta.next((m) => m.type === 'batch').then(() => true, () => false);
   assert.equal(vazou, false);

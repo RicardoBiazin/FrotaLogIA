@@ -131,6 +131,27 @@ button, input { font: inherit; color: inherit; }
 .kpis { margin: 10px 0 0; font-size: 13px; color: var(--ink-2); }
 .kpis b { color: var(--ink); font-variant-numeric: tabular-nums; }
 
+/* Busca no estoque (lista lateral) */
+.stock-results { margin: 0 20px 8px; padding: 8px 6px 6px; border: 1px solid #f2d27a; border-radius: 10px; background: #fffaf0; }
+.stock-results .sub { margin: 0 6px 6px; }
+.stock-results ol { margin: 0; padding: 0; list-style: none; max-height: 220px; overflow-y: auto; }
+.stock-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 10px;
+  width: 100%;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.stock-row:hover { background: #fdf0cc; }
+.stock-row b { grid-row: span 2; font-variant-numeric: tabular-nums; }
+.stock-row .muted { font-size: 12px; }
+
 /* Movimentação nos CDs */
 .events { margin: 0 20px 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
 .events summary {
@@ -317,6 +338,34 @@ button, input { font: inherit; color: inherit; }
 .route .arrow { color: var(--ink-2); }
 .trip dl { margin-top: 10px; }
 #no-trip { margin: 0 0 12px; font-size: 13px; }
+
+/* Posição de prateleira */
+.slot-glyph::before {
+  content: "";
+  width: 20px; height: 20px;
+  border-radius: 4px;
+  background: linear-gradient(#4f6d8a 0 25%, #fff 25% 33%, #7a95ae 33% 58%, #fff 58% 66%, #a5b9ca 66% 91%, #fff 91%);
+  box-shadow: 0 0 0 1px #4f6d8a;
+}
+.niveis { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.nivel {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-left: 4px solid #4f6d8a;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.nivel.vazio { border-left-color: var(--line); color: var(--ink-2); background: var(--chalk); }
+.nivel-label { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.nivel p { margin: 0; }
+.nivel-desc { font-weight: 600; }
+.nivel-qtd { font-variant-numeric: tabular-nums; }
+.validade { margin-top: 2px !important; font-size: 12px; color: var(--sign); }
+.validade[data-situacao="vencendo"] { color: #8a6200; font-weight: 600; }
+.validade[data-situacao="vencido"] { color: #b3261e; font-weight: 600; }
 
 /* Card do CD */
 .cd-glyph::before {

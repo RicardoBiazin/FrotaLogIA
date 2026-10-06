@@ -5,9 +5,10 @@ Logística de transporte em tempo real, **por cliente**: cada empresa vê a pró
 - **Mapa** (MapLibre GL) com os veículos animados e os CDs. Cada CD mostra quantos veículos estão no pátio e quantos estão a caminho.
 - **Dados do transporte:** ao clicar num veículo, o card mostra a viagem. Ela traz origem e destino, carga, peso, volume, quantidade de volumes, valor, remetente, destinatário, documento (CT-e) e previsão de chegada.
 - **Centros de distribuição:** clique num CD para ver o pátio, as chegadas previstas e as últimas entradas e saídas. "Abrir planta" mostra o interior, com as empilhadeiras em tempo real e os caminhões encostados nas docas.
+- **Prateleiras e estoque:** na planta, cada prateleira aparece dividida em posições, coloridas pelos níveis ocupados. Clique numa posição para ver o que há em cada nível: produto, SKU, depositante, quantidade, peso, lote, data de entrada e validade, com aviso de vencido ou vencendo. Busque um produto, SKU ou lote para ver em que endereço e em que CD ele está; as posições acendem na planta.
 - **Movimentação:** entradas e saídas dos CDs são detectadas sozinhas, por uma cerca virtual em volta de cada CD.
 - **Multi-cliente:** cada empresa entra com a própria chave de acesso e só enxerga a própria frota, tanto na API quanto no WebSocket.
-- **Simulador** com uma rede de exemplo na Grande Florianópolis: 4 CDs, 8 veículos com viagens e 5 empilhadeiras. Assim dá para ver tudo funcionando antes de ligar dados reais.
+- **Simulador** com uma rede de exemplo na Grande Florianópolis: 4 CDs, 8 veículos com viagens, 5 empilhadeiras e cerca de 250 paletes nas prateleiras, com separação, recebimento e expedição acontecendo. Assim dá para ver tudo funcionando antes de ligar dados reais.
 
 ## Começando
 
@@ -47,7 +48,7 @@ Os CDs de cada cliente ficam no mesmo arquivo:
 }]
 ```
 
-`raioM` é o raio da cerca, em metros. A planta interna (`planta`) é opcional e segue o formato de `server/demo.js`.
+`raioM` é o raio da cerca, em metros. A planta interna (`planta`) é opcional e segue o formato de `server/demo.js`. Cada prateleira da planta é uma rua: `{ "id": "A", "x": 10, "y": 22, "w": 70, "h": 3, "posicoes": 14, "niveis": 4 }`. As posições são contadas ao longo do lado maior (de oeste para leste ou de sul para norte), e os níveis de baixo para cima.
 
 Com o arquivo presente, toda chamada à API e ao WebSocket exige chave, e o servidor passa a escutar em todas as interfaces de rede. Sem o arquivo, `API_KEY` vira a chave do cliente demo.
 
@@ -94,6 +95,20 @@ Dentro de um CD (planta, sem GPS), `espaco` é o id do CD e `x`/`y` vêm em metr
 - Mande a viagem de novo, com o mesmo `id`, sempre que algo mudar (status, previsão).
 - Quando `origem.cd` ou `destino.cd` aponta para um CD, a viagem entra no painel daquele CD.
 
+### Estoque (posição-palete)
+
+O endereço segue o padrão de armazém **RUA-POSIÇÃO-NÍVEL**: `A-03-2` é a rua A, posição 3, nível 2. Cada endereço guarda um palete com um único produto.
+
+```json
+{ "cd": "cd-sao-jose", "endereco": "A-03-2", "sku": "BEB-3001",
+  "descricao": "Cerveja lata 350 ml (caixa 12 un)", "depositante": "Atacado Serra Mar",
+  "quantidade": 96, "unidade": "cx", "lote": "L2600173", "validade": "2027-03-10",
+  "pesoKg": 442, "entradaEm": "2026-09-09" }
+```
+
+- O endereço é conferido contra a planta do CD: rua, posição ou nível inexistente é recusado com a explicação.
+- Mande o endereço de novo a cada movimentação. `"quantidade": 0` libera a posição.
+
 ## API
 
 Tudo, exceto `/api/config` e `/api/health`, exige o header `x-api-key` com a chave do cliente.
@@ -108,6 +123,9 @@ Tudo, exceto `/api/config` e `/api/health`, exige o header `x-api-key` com a cha
 | `DELETE /api/assets/:id` | Remove um ativo. |
 | `GET /api/viagens?status=&veiculo=&ativas=true` e `/api/viagens/:id` | Viagens do cliente. |
 | `GET /api/centros` | CDs do cliente, com a planta. |
+| `POST /api/estoque` | Paletes nos endereços: um objeto ou uma lista (até 1000). `quantidade: 0` libera o endereço. |
+| `GET /api/centros/:cd/estoque` | Todas as posições ocupadas de um CD. |
+| `GET /api/estoque?q=&cd=` | Onde está o produto: busca por SKU, descrição, depositante, lote ou endereço em todos os CDs. |
 | `GET /api/eventos?limit=` | Últimas entradas e saídas de CD. |
 | `GET /api/sessao` | Qual cliente a chave identifica. |
 | `GET /api/config`, `/api/health` | Configuração da tela e saúde (públicas, sem dados de cliente). |
@@ -175,7 +193,8 @@ server/
   app.js          API REST por cliente e arquivos estáticos
   hub.js          WebSocket: autenticação, snapshot e lotes por cliente
   tenants.js      clientes e chaves de acesso
-  centros.js      CDs, cerca virtual e planta
+  centros.js      CDs, cerca virtual e planta (ruas, posições e níveis)
+  estoque.js      paletes nos endereços das prateleiras
   viagens.js      viagens (dados do transporte)
   eventos.js      entradas e saídas de CD
   normalize.js    validação das posições
@@ -183,20 +202,21 @@ server/
   ingest.js       único caminho de entrada de dados
   demo.js         rede de exemplo da Grande Florianópolis
   adapters/       conversores de fontes externas (Traccar)
-  sim/            simulador (rotas, OSRM, veículos e viagens)
+  sim/            simulador (rotas, OSRM, veículos, viagens e estoque)
 public/
   index.html, css/style.css
   js/main.js        orquestra acesso, dados, animação e interface
   js/logistica.js   resumo de CD, busca e formatação (código puro, testado)
+  js/estoque.js     endereços, ocupação e validade (código puro, também usado pelo servidor)
   js/interp.js      interpolação do movimento (código puro, testado)
   js/geoView.js     mapa (MapLibre)    js/indoorView.js  planta do CD (canvas)
-test/             65 testes (node --test)
+test/             74 testes (node --test)
 scripts/          novo-cliente.js, fake-device.js, licencas.js
 ```
 
 ## Antes de ir para produção
 
-- **Persistência:** tudo fica em memória. Reiniciar o servidor apaga posições, viagens e eventos.
+- **Persistência:** tudo fica em memória. Reiniciar o servidor apaga posições, viagens, eventos e estoque.
 - **Acesso:** hoje cada empresa tem uma única chave, sem usuários individuais. Use HTTPS (proxy reverso com TLS) para a chave não trafegar em texto puro. Revogue a chave de quem sair com `npm run cliente -- <id> --nova-chave`.
 - **LGPD:** a posição de um veículo revela a rotina do motorista e é dado pessoal. Defina base legal, retenção, controle de acesso e registro de consultas.
 - **Limite de requisições:** o servidor não limita requisições por cliente. Configure isso no proxy reverso (nginx, Caddy).

@@ -3,6 +3,7 @@ import { config, VERSION } from './config.js';
 import { AssetStore } from './store.js';
 import { ViagemStore } from './viagens.js';
 import { EventLog } from './eventos.js';
+import { EstoqueStore } from './estoque.js';
 import { loadTenants } from './tenants.js';
 import { createIngest } from './ingest.js';
 import { createApp } from './app.js';
@@ -27,10 +28,11 @@ const store = new AssetStore({
 });
 const viagens = new ViagemStore();
 const eventos = new EventLog();
-const ingest = createIngest({ store, viagens, eventos, tenants });
-const app = createApp({ config, store, viagens, eventos, ingest, tenants, version: VERSION });
+const estoque = new EstoqueStore();
+const ingest = createIngest({ store, viagens, eventos, estoque, tenants });
+const app = createApp({ config, store, viagens, eventos, estoque, ingest, tenants, version: VERSION });
 const server = http.createServer(app);
-const hub = createHub({ server, store, viagens, eventos, tenants, batchMs: config.batchMs });
+const hub = createHub({ server, store, viagens, eventos, estoque, tenants, batchMs: config.batchMs });
 
 const sweepTimer = setInterval(() => store.sweep(), 5_000);
 let simulation = null;
@@ -52,7 +54,7 @@ server.listen(config.port, host, () => {
       console.warn(`[sim] cliente "${config.simCliente}" não existe; simulador desligado (ver SIM_CLIENTE).`);
       return;
     }
-    startSimulation({ ingest, config, cliente: config.simCliente })
+    startSimulation({ ingest, config, cliente: config.simCliente, centros: tenants.get(config.simCliente).centros })
       .then((sim) => {
         simulation = sim;
       })

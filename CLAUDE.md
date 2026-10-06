@@ -19,7 +19,7 @@ Usuário final: operadores de logística/frota.
 ```bash
 npm install
 npm run dev     # node --watch server/index.js  → http://localhost:3000
-npm test        # node --test (65 testes; devem passar sempre)
+npm test        # node --test (74 testes; devem passar sempre)
 npm run licencas  # regenera THIRD_PARTY_NOTICES.md e barra licença copyleft
 npm run cliente -- <id> "<nome>" [--demo]   # cria cliente em data/clientes.json e mostra a chave uma vez
 npm run device  # simula um dispositivo externo enviando posições por HTTP
@@ -36,6 +36,7 @@ chave (x-api-key / auth no WS) → tenants.js → cliente
 fonte (HTTP / adaptador / simulador)
   → ingest.position(cliente, …) → normalize.js → cerca dos CDs (centros.js) → store.js
   → ingest.trip(cliente, …)     → viagens.js (ViagemStore)
+  → ingest.stock(cliente, …)    → estoque.js (EstoqueStore; endereço validado contra a planta)
   → entrada/saída de CD          → eventos.js (EventLog)
   → hub.js (por cliente, lotes de BATCH_MS) → WebSocket
   → public/js/ws.js → main.js → interp.js + logistica.js → geoView.js | indoorView.js
@@ -58,13 +59,15 @@ fonte (HTTP / adaptador / simulador)
 - Ao trocar entre mapa e planta (`espaco` muda), o rastro recomeça no servidor e no cliente: as coordenadas não se misturam.
 - Busca em tabela de sinônimos vinda de entrada externa usa `Object.hasOwn` ("constructor" e "__proto__" já corromperam o `tipo`).
 - **CD** (`server/centros.js`): ponto + `raioM` (cerca) + `planta` opcional. Veículo de rua dentro do raio recebe `cd`; ele só sai depois de `raio + max(150 m, 50%)` (histerese: a estrada perto da borda fazia o GPS entrar e sair em sequência). Ativo de planta usa `espaco` = id do CD.
+- **Estoque** (`server/estoque.js` + `public/js/estoque.js`): endereço `RUA-POSIÇÃO-NÍVEL` (`A-03-2`), uma posição-palete por endereço, `quantidade: 0` libera. Prateleira da planta = rua, com `id`, `posicoes` (ao longo do lado maior) e `niveis` (1 = chão). A validação de endereço mora em `public/js/estoque.js` e é importada pelo servidor: uma regra só para os dois lados. O estoque completo vem por `GET /api/centros/:cd/estoque`; o WS manda só as posições alteradas no `batch` (`removido: true` = liberada).
 - **Viagem** (`server/viagens.js`): `status` em `planejada | carregando | em_transito | descarregando | entregue | cancelada`; peso em kg, volume em m³, valor em R$. O navegador guarda só as ativas, indexadas por veículo (`applyViagem` em `logistica.js`).
 - Nomes de campos de domínio são em português (`tipo`, `rumo`, `velocidade`, `espaco`, `atributos`); nomes de infraestrutura em inglês.
 - Tipos válidos estão em `server/normalize.js` (`TIPOS`) e `public/js/icons.js`. Ao criar um tipo novo, atualize os dois, o desenho em `icons.js` e os testes.
 
 ## Frontend
 
-- `public/js/interp.js` e `public/js/logistica.js` são **código puro** (sem DOM), testados em `test/interp.test.js` e `test/logistica.test.js`. Regra nova de tela (resumo de CD, busca, formatação) vai para `logistica.js`, com teste.
+- `public/js/interp.js`, `public/js/logistica.js` e `public/js/estoque.js` são **código puro** (sem DOM), testados em `test/interp.test.js` e `test/logistica.test.js`. Regra nova de tela (resumo de CD, busca, formatação) vai para `logistica.js`, com teste.
+- Na planta, cada prateleira é desenhada por posição, com a cor pelos níveis ocupados (`OCUPACAO_FILL` em `indoorView.js`); a busca acende as posições em amarelo. Clique: veículo bem em cima ganha, senão a posição da prateleira.
 - Na planta, os veículos de rua no pátio do CD aparecem encostados nas docas (`portas`, na ordem do id); os que sobram viram uma linha "Aguardando doca".
 - Animação: cada `AnimatedAsset` desliza da pose exibida até a nova durante o intervalo típico entre atualizações (calculado pela diferença de `ts`), e projeta por velocidade/rumo por até 3 s se a atualização atrasar. Lacuna > 60 s salta direto.
 - O mapa **carrega em paralelo** ao WebSocket: lista, contadores e planta não podem depender do evento `load` do MapLibre (tiles lentos já travaram o app uma vez).
@@ -94,7 +97,7 @@ fonte (HTTP / adaptador / simulador)
 
 ## Roadmap (em ordem de prioridade)
 
-Feito na v0.3.0: cerca circular dos CDs com eventos (`GET /api/eventos`, WS `evento`) e autenticação por cliente na leitura e na escrita.
+Feito na v0.3.0: cerca circular dos CDs com eventos (`GET /api/eventos`, WS `evento`) e autenticação por cliente na leitura e na escrita. Na v0.4.0: estoque endereçado nas prateleiras (rua-posição-nível), com busca de produto.
 
 1. **Persistência e cadastro.** Banco (PostgreSQL/PostGIS) para clientes, CDs, viagens e eventos; tela de cadastro de CDs e de clientes no lugar do `data/clientes.json`. Hoje reiniciar apaga tudo.
 2. **Usuários por cliente.** Hoje é uma chave por empresa; o próximo passo é usuário/senha (ou SSO) com papéis (operador, gestor) e registro de quem consultou o quê (LGPD).
@@ -103,8 +106,9 @@ Feito na v0.3.0: cerca circular dos CDs com eventos (`GET /api/eventos`, WS `eve
 5. **Última posição em Redis + pub/sub**, para rodar mais de uma instância do servidor.
 6. **Escala.** Filtro por área visível no WS (`{ type: 'viewport', bbox }`) e deck.gl para milhares de ativos; virtualizar a lista lateral.
 7. **Mais fontes.** Ingestão MQTT e adaptadores em `server/adapters/` (Sascar, Omnilink, Samsara, Geotab, FMS de fábrica). Cada adaptador só converte para o formato do ativo e chama `ingest`.
-8. **Planta real e docas.** Plantas de GeoJSON/CAD, cercas em polígono, doca atribuída pelo WMS/RTLS (hoje é pela ordem do id) e integração com RTLS (UWB/BLE).
-9. **Alertas operacionais.** Atraso na previsão, sem sinal por mais de N minutos, parado além do esperado, tempo de pátio, excesso de velocidade; relatórios por período.
-10. **LGPD.** Retenção configurável, anonimização de rastros antigos, registro de quem consultou o quê.
+8. **Estoque de verdade (WMS).** Integração com o WMS do cliente, mais de um palete por endereço (picking fracionado), histórico de movimentação por endereço e inventário.
+9. **Planta real e docas.** Plantas de GeoJSON/CAD, cercas em polígono, doca atribuída pelo WMS/RTLS (hoje é pela ordem do id) e integração com RTLS (UWB/BLE).
+10. **Alertas operacionais.** Atraso na previsão, sem sinal por mais de N minutos, parado além do esperado, tempo de pátio, excesso de velocidade; relatórios por período.
+11. **LGPD.** Retenção configurável, anonimização de rastros antigos, registro de quem consultou o quê.
 
 Antes de grandes mudanças (itens 1 a 6), proponha um plano curto e confirme com o usuário.

@@ -7,6 +7,7 @@ import { Path } from '../geo.js';
 import { AGENTS, GEO_ROUTES, WAREHOUSE_PATHS } from './routes.js';
 import { fetchRoute } from './osrm.js';
 import { CARGAS, EMPRESAS, PESSOAS } from '../demo.js';
+import { startStockSimulation } from './estoque.js';
 
 const rand = (min, max) => min + Math.random() * (max - min);
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
@@ -131,7 +132,7 @@ class Agent {
   }
 }
 
-export async function startSimulation({ ingest, config, cliente }) {
+export async function startSimulation({ ingest, config, cliente, centros = [] }) {
   const geoPaths = {};
   await Promise.all(
     Object.entries(GEO_ROUTES).map(async ([key, route]) => {
@@ -190,10 +191,13 @@ export async function startSimulation({ ingest, config, cliente }) {
     timers.set(def.id, setTimeout(tick, rand(0, interval)));
   }
 
+  const stock = startStockSimulation({ ingest, cliente, centros });
+
   console.log(`[sim] ${AGENTS.length} ativos simulados para o cliente "${cliente}" (tempo x${config.simSpeedup} nas rotas urbanas).`);
   return {
     stop() {
       running = false;
+      stock.stop();
       for (const t of timers.values()) clearTimeout(t);
       timers.clear();
     },

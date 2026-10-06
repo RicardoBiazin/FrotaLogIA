@@ -5,7 +5,9 @@
 //
 // Mensagens do servidor → cliente:
 //   { type: 'snapshot', cliente: { id, nome }, assets: [...], viagens: [...], eventos: [...] }
-//   { type: 'batch',    assets: [...], viagens: [...] }
+//   { type: 'batch',    assets: [...], viagens: [...], estoque: [...] }
+//     (estoque: posições alteradas, com cd e endereco; { removido: true } = endereço liberado.
+//      O estoque completo de um CD vem por GET /api/centros/:cd/estoque.)
 //   { type: 'remove',   id }
 //   { type: 'evento',   evento }
 // Chave inválida: a conexão é fechada com o código 4401.
@@ -17,15 +19,15 @@ import { publicAsset } from './store.js';
 export const WS_UNAUTHORIZED = 4401;
 const AUTH_TIMEOUT_MS = 10_000;
 
-export function createHub({ server, store, viagens, eventos, tenants, batchMs = 250 }) {
+export function createHub({ server, store, viagens, eventos, estoque, tenants, batchMs = 250 }) {
   const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 16 * 1024 });
-  // cliente → { assets: Map<id, asset>, viagens: Map<id, viagem> }
+  // cliente → { assets: Map<id, asset>, viagens: Map<id, viagem>, estoque: Map<cd|endereco, item> }
   const pending = new Map();
 
   const pendingOf = (cliente) => {
     let p = pending.get(cliente);
     if (!p) {
-      p = { assets: new Map(), viagens: new Map() };
+      p = { assets: new Map(), viagens: new Map(), estoque: new Map() };
       pending.set(cliente, p);
     }
     return p;
@@ -84,17 +86,25 @@ export function createHub({ server, store, viagens, eventos, tenants, batchMs = 
   };
   const onViagem = (cliente, viagem) => pendingOf(cliente).viagens.set(viagem.id, viagem);
   const onEvento = (cliente, evento) => broadcast(cliente, { type: 'evento', evento });
+  const onEstoque = (cliente, item) => pendingOf(cliente).estoque.set(`${item.cd}|${item.endereco}`, item);
   store.on('update', onUpdate);
   store.on('remove', onRemove);
   viagens.on('update', onViagem);
   eventos.on('evento', onEvento);
+  estoque.on('update', onEstoque);
 
   const flushTimer = setInterval(() => {
     for (const [cliente, p] of pending) {
-      if (p.assets.size === 0 && p.viagens.size === 0) continue;
-      const message = { type: 'batch', assets: [...p.assets.values()], viagens: [...p.viagens.values()] };
+      if (p.assets.size === 0 && p.viagens.size === 0 && p.estoque.size === 0) continue;
+      const message = {
+        type: 'batch',
+        assets: [...p.assets.values()],
+        viagens: [...p.viagens.values()],
+        estoque: [...p.estoque.values()],
+      };
       p.assets.clear();
       p.viagens.clear();
+      p.estoque.clear();
       broadcast(cliente, message);
     }
   }, batchMs);
@@ -119,6 +129,7 @@ export function createHub({ server, store, viagens, eventos, tenants, batchMs = 
       store.off('remove', onRemove);
       viagens.off('update', onViagem);
       eventos.off('evento', onEvento);
+      estoque.off('update', onEstoque);
       for (const ws of wss.clients) ws.terminate();
       wss.close();
     },

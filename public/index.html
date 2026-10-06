@@ -45,10 +45,15 @@
       <div class="filters">
         <label class="search">
           <span class="sr-only">Buscar</span>
-          <input id="search" type="search" placeholder="Buscar veículo, carga, destino, cliente…" autocomplete="off">
+          <input id="search" type="search" placeholder="Buscar veículo, carga, produto, SKU, lote…" autocomplete="off">
         </label>
         <div id="type-filters" class="chips" role="group" aria-label="Filtrar por tipo"></div>
       </div>
+
+      <section id="estoque-busca" class="stock-results" aria-live="polite" hidden>
+        <h2 class="sub"><span id="estoque-busca-titulo"></span></h2>
+        <ol id="estoque-busca-list"></ol>
+      </section>
 
       <details id="eventos" class="events" open>
         <summary>Movimentação nos CDs <b id="eventos-count">0</b></summary>
@@ -129,6 +134,11 @@
           <div><dt>A caminho</dt><dd id="cd-chegando">0</dd></div>
           <div><dt>Empilhadeiras</dt><dd id="cd-empilhadeiras">0</dd></div>
         </dl>
+        <dl id="cd-estoque" class="stats">
+          <div><dt>Ocupação</dt><dd id="cd-ocupacao">—</dd></div>
+          <div><dt>SKUs</dt><dd id="cd-skus">—</dd></div>
+          <div><dt>Vencendo</dt><dd id="cd-vencendo">—</dd></div>
+        </dl>
         <h3 class="sub">No pátio</h3>
         <ul id="cd-patio-list" class="mini"></ul>
         <h3 class="sub">A caminho</h3>
@@ -139,6 +149,19 @@
           <button id="cd-planta" class="action" type="button">Abrir planta</button>
           <button id="cd-mapa" class="action secondary-action" type="button">Ver no mapa</button>
         </div>
+      </section>
+
+      <!-- Posição de prateleira -->
+      <section id="slot-detail" class="detail" aria-live="off" hidden>
+        <header>
+          <span class="glyph slot-glyph" aria-hidden="true"></span>
+          <div class="titles">
+            <h2 id="slot-name"></h2>
+            <p id="slot-sub"></p>
+          </div>
+          <button id="slot-close" class="close" type="button" aria-label="Fechar prateleira">Fechar</button>
+        </header>
+        <ol id="slot-niveis" class="niveis"></ol>
       </section>
     </main>
   </div>

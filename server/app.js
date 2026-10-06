@@ -49,7 +49,7 @@ const publicCentro = (c) => ({
   planta: c.planta ? { ...c.planta, id: c.id, nome: c.nome } : null,
 });
 
-export function createApp({ config, store, viagens, eventos, ingest, tenants, version = null }) {
+export function createApp({ config, store, viagens, eventos, estoque, ingest, tenants, version = null }) {
   const app = express();
   app.disable('x-powered-by');
   app.use(securityHeaders);
@@ -95,6 +95,19 @@ export function createApp({ config, store, viagens, eventos, ingest, tenants, ve
   api.get('/sessao', (req, res) => res.json({ cliente: { id: req.tenant.id, nome: req.tenant.nome } }));
 
   api.get('/centros', (req, res) => res.json(req.tenant.centros.map(publicCentro)));
+
+  // Estoque endereçado de um CD (posições ocupadas) e busca de produto em todos os CDs.
+  api.get('/centros/:cd/estoque', (req, res) => {
+    if (!req.tenant.centros.some((c) => c.id === req.params.cd)) return res.status(404).json({ erro: 'CD não encontrado' });
+    res.json(estoque.list(req.cliente, req.params.cd));
+  });
+
+  api.get('/estoque', (req, res) => {
+    const q = typeof req.query.q === 'string' ? req.query.q : '';
+    const cd = typeof req.query.cd === 'string' ? req.query.cd : undefined;
+    if (!q && !cd) return res.status(400).json({ erro: 'informe q (produto, SKU, lote, endereço) ou cd' });
+    res.json(estoque.search(req.cliente, q, { cd }));
+  });
 
   api.get('/assets', (req, res) => {
     const { tipo, espaco } = req.query;
@@ -161,6 +174,10 @@ export function createApp({ config, store, viagens, eventos, ingest, tenants, ve
 
   api.post('/viagens', (req, res) => {
     ingestMany(asList(req.body), res, (item) => ingest.trip(req.cliente, item));
+  });
+
+  api.post('/estoque', (req, res) => {
+    ingestMany(asList(req.body), res, (item) => ingest.stock(req.cliente, item));
   });
 
   api.delete('/assets/:id', (req, res) => {

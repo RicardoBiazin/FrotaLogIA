@@ -1,12 +1,13 @@
 import { normalizePosition } from './normalize.js';
 import { normalizeViagem } from './viagens.js';
 import { locateCentro } from './centros.js';
+import { normalizeEstoque } from './estoque.js';
 
 /**
  * Único caminho de entrada de dados: HTTP, adaptadores e simulador passam por aqui.
  * Toda entrada pertence a um cliente (resolvido pela chave de acesso, ou o do simulador).
  */
-export function createIngest({ store, viagens, eventos, tenants }) {
+export function createIngest({ store, viagens, eventos, estoque, tenants }) {
   function position(cliente, raw, now = Date.now()) {
     const result = normalizePosition(raw, now);
     if (!result.ok) return result;
@@ -38,5 +39,17 @@ export function createIngest({ store, viagens, eventos, tenants }) {
     return stored.stored ? { ok: true } : { ok: false, error: stored.reason };
   }
 
-  return { position, trip };
+  /** Posição-palete numa prateleira do CD (quantidade 0 libera o endereço). */
+  function stock(cliente, raw, now = Date.now()) {
+    const result = normalizeEstoque(raw, tenants.get(cliente)?.centros ?? [], now);
+    if (!result.ok) return result;
+    if (result.remover) {
+      estoque.remove(cliente, result.remover.cd, result.remover.endereco);
+      return { ok: true };
+    }
+    const stored = estoque.upsert(cliente, result.item);
+    return stored.stored ? { ok: true } : { ok: false, error: stored.reason };
+  }
+
+  return { position, trip, stock };
 }

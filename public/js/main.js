@@ -8,6 +8,10 @@ import {
   VIAGEM_LABEL, applyViagem, resumoCentro, matchesQuery,
   formatPeso, formatVolume, formatValor, formatPrevisao, formatHora,
 } from './logistica.js';
+import {
+  ocupacaoPorPosicao, itensDaPosicao, resumoEstoque, matchesItem, situacaoValidade, diasAte,
+  posicaoKey, parseEndereco,
+} from './estoque.js';
 
 const $ = (selector) => document.querySelector(selector);
 const els = {
@@ -27,6 +31,7 @@ const els = {
   cdSelect: $('#cd-select'),
   detail: $('#detail'),
   cdDetail: $('#cd-detail'),
+  slotDetail: $('#slot-detail'),
   follow: $('#follow'),
   followWrap: $('#follow-wrap'),
   trail: $('#trail'),
@@ -43,6 +48,8 @@ const state = {
   viagemPorVeiculo: new Map(), // veiculo → viagem ativa
   eventos: [], // mais recentes primeiro
   centros: [],
+  estoque: new Map(), // cd → Map<endereco, item> (CDs com prateleiras)
+  selectedSlot: null, // { cd, rua, posicao }
   tipos: new Set(TIPOS.map((t) => t.id)),
   query: '',
   view: 'map', // 'map' | 'indoor'
@@ -137,9 +144,15 @@ function maybeFit() {
   geo.fit([...items, ...state.centros.map((c) => ({ x: c.lon, y: c.lat }))]);
 }
 
-function onBatch({ assets, viagens }) {
+function onBatch({ assets, viagens, estoque }) {
   const now = performance.now();
   for (const v of viagens ?? []) applyViagem(state.viagens, state.viagemPorVeiculo, v);
+  for (const item of estoque ?? []) {
+    const itens = state.estoque.get(item.cd);
+    if (!itens) continue; // CD ainda não carregado: virá completo no carregamento
+    if (item.removido) itens.delete(item.endereco);
+    else itens.set(item.endereco, item);
+  }
   for (const data of assets ?? []) {
     const prevEspaco = state.assets.get(data.id)?.data.espaco ?? null;
     upsert(data, now);
@@ -342,7 +355,9 @@ function renderList() {
     els.empty.textContent =
       state.assets.size === 0
         ? 'Aguardando as primeiras posições…'
-        : 'Nada corresponde à busca. Limpe a busca ou ative mais tipos.';
+        : $('#estoque-busca').hidden
+          ? 'Nada corresponde à busca. Limpe a busca ou ative mais tipos.'
+          : 'Nenhum veículo corresponde à busca; o produto está no estoque acima.';
   }
 }
 
@@ -493,6 +508,16 @@ function updateCdDetail() {
       .map((e) => ({ id: e.veiculo, text: `${e.nome} ${e.tipo === 'entrada' ? 'entrou' : 'saiu'}`, meta: formatHora(e.ts) })),
     'Sem movimentação recente.',
   );
+  const itens = state.estoque.get(cd.id);
+  $('#cd-estoque').hidden = !itens;
+  if (itens) {
+    const r = resumoEstoque([...itens.values()], cd.planta, now);
+    setText('#cd-ocupacao', `${r.percentual}%`);
+    $('#cd-ocupacao').title = `${fmt(r.ocupadas)} de ${fmt(r.total)} posições-palete`;
+    setText('#cd-skus', fmt(r.skus));
+    setText('#cd-vencendo', fmt(r.vencendo + r.vencidos));
+    $('#cd-vencendo').title = `${r.vencendo} vencem em até 30 dias, ${r.vencidos} vencidos`;
+  }
   $('#cd-planta').hidden = !cd.planta || (state.view === 'indoor' && state.space?.id === cd.id);
   $('#cd-mapa').hidden = state.view === 'map';
 }
@@ -515,7 +540,7 @@ function updateCdLabels() {
 /** Na planta, afasta o desenho do card que estiver aberto (ele flutua sobre o palco). */
 function syncIndoorInsets() {
   if (!indoor) return;
-  const card = [els.detail, els.cdDetail].find((c) => !c.hidden);
+  const card = [els.detail, els.cdDetail, els.slotDetail].find((c) => !c.hidden);
   if (state.view !== 'indoor' || !card) {
     indoor.setInsets(0, 0);
     return;
@@ -534,9 +559,11 @@ function syncIndoorInsets() {
 
 function refreshUi() {
   updateSummary();
+  updateEstoqueView(); // antes da lista: a mensagem de "nada encontrado" depende dela
   renderList();
   updateDetail();
   updateCdDetail();
+  updateSlotDetail();
   updateCdLabels();
   syncIndoorInsets();
 }
@@ -552,6 +579,7 @@ function showSpace(cdId) {
   state.space = cd.planta;
   els.cdSelect.value = cd.id;
   indoor.setSpace(state.space);
+  updateEstoqueView();
 }
 
 function setView(view) {
@@ -582,6 +610,7 @@ async function select(id) {
     return;
   }
   state.selectedCd = null;
+  state.selectedSlot = null;
   geo?.setSelectedCd(null);
 
   const d = asset.data;
@@ -611,6 +640,7 @@ async function select(id) {
 function selectCd(id, { openPlanta = false } = {}) {
   const cd = centroById(id);
   select(null);
+  state.selectedSlot = null;
   state.selectedCd = cd ? cd.id : null;
   geo?.setSelectedCd(state.selectedCd);
   if (cd) {
@@ -621,6 +651,160 @@ function selectCd(id, { openPlanta = false } = {}) {
       geo?.flyTo(cd.lon, cd.lat, 14.5);
     }
   }
+  refreshUi();
+}
+
+// ---------- Estoque nas prateleiras ----------
+
+async function loadEstoque(cdId) {
+  try {
+    const itens = await api(`/api/centros/${encodeURIComponent(cdId)}/estoque`);
+    state.estoque.set(cdId, new Map(itens.map((i) => [i.endereco, i])));
+  } catch (err) {
+    console.warn(`Estoque do ${nomeCentro(cdId)} indisponível:`, err.message);
+  }
+}
+
+/** Itens do estoque que batem com a busca, em todos os CDs carregados. */
+function buscaEstoque() {
+  const q = state.query.trim();
+  if (q.length < 2) return [];
+  const out = [];
+  for (const itens of state.estoque.values()) {
+    for (const item of itens.values()) if (matchesItem(item, q)) out.push(item);
+  }
+  // O CD aberto na planta vem primeiro; depois por CD e endereço.
+  const aberto = state.space?.id;
+  return out.sort(
+    (a, b) => (b.cd === aberto) - (a.cd === aberto) || a.cd.localeCompare(b.cd) || a.endereco.localeCompare(b.endereco),
+  );
+}
+
+/** Planta (ocupação, destaque da busca, posição selecionada) e lista de resultados. */
+function updateEstoqueView() {
+  const encontrados = buscaEstoque();
+  if (indoor && state.space) {
+    const itens = [...(state.estoque.get(state.space.id)?.values() ?? [])];
+    const destaque = new Set();
+    for (const item of encontrados) {
+      const e = item.cd === state.space.id && parseEndereco(item.endereco);
+      if (e) destaque.add(posicaoKey(e.rua, e.posicao));
+    }
+    const sel = state.selectedSlot?.cd === state.space.id ? state.selectedSlot : null;
+    indoor.setEstoque(ocupacaoPorPosicao(itens), destaque, sel);
+  }
+
+  const box = $('#estoque-busca');
+  box.hidden = encontrados.length === 0;
+  if (box.hidden) return;
+  const porCd = new Set(encontrados.map((i) => i.cd)).size;
+  const n = encontrados.length;
+  setText(
+    '#estoque-busca-titulo',
+    `No estoque: ${fmt(n)} ${n === 1 ? 'posição' : 'posições'}${porCd > 1 ? ` em ${porCd} CDs` : ''}`,
+  );
+  const list = $('#estoque-busca-list');
+  const visiveis = encontrados.slice(0, 50);
+  const signature = visiveis.map((i) => `${i.cd}|${i.endereco}|${i.quantidade}`).join(',');
+  if (list.dataset.sig === signature) return;
+  list.dataset.sig = signature;
+  list.replaceChildren(
+    ...visiveis.map((item) => {
+      const li = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'stock-row';
+      button.dataset.cd = item.cd;
+      button.dataset.endereco = item.endereco;
+      const end = document.createElement('b');
+      end.textContent = item.endereco;
+      const desc = document.createElement('span');
+      desc.textContent = item.descricao;
+      const meta = document.createElement('span');
+      meta.className = 'muted';
+      meta.textContent = `${nomeCentro(item.cd)} · ${fmt(item.quantidade)} ${item.unidade}`;
+      button.append(end, desc, meta);
+      li.append(button);
+      return li;
+    }),
+  );
+}
+
+const formatData = (ts) => new Date(ts).toLocaleDateString('pt-BR');
+
+/** Um nível da posição: o palete que está nele, ou "Vazio". */
+function nivelItem(nivel, item, now) {
+  const li = document.createElement('li');
+  li.className = 'nivel';
+  const label = document.createElement('span');
+  label.className = 'nivel-label';
+  label.textContent = `Nível ${nivel}`;
+  const body = document.createElement('div');
+  li.append(label, body);
+  if (!item) {
+    li.classList.add('vazio');
+    body.textContent = 'Vazio';
+    return li;
+  }
+  const add = (cls, text) => {
+    const el = document.createElement('p');
+    el.className = cls;
+    el.textContent = text;
+    body.append(el);
+    return el;
+  };
+  add('nivel-desc', item.descricao);
+  add('muted', [item.sku, item.depositante].filter(Boolean).join(' · '));
+  add('nivel-qtd', [`${fmt(item.quantidade)} ${item.unidade}`, item.pesoKg ? formatPeso(item.pesoKg) : null].filter(Boolean).join(' · '));
+  const origem = [item.lote ? `Lote ${item.lote}` : null, item.entradaEm ? `entrada ${formatData(item.entradaEm)}` : null];
+  add('muted', origem.filter(Boolean).join(' · '));
+  const situacao = situacaoValidade(item.validade, now);
+  if (situacao) {
+    const dias = diasAte(item.validade, now);
+    const texto = situacao === 'vencido'
+      ? `Vencido em ${formatData(item.validade)}`
+      : `Validade ${formatData(item.validade)}${situacao === 'vencendo' ? ` (vence em ${dias} ${dias === 1 ? 'dia' : 'dias'})` : ''}`;
+    add('validade', texto).dataset.situacao = situacao;
+  }
+  return li;
+}
+
+function updateSlotDetail() {
+  const slot = state.selectedSlot;
+  const cd = slot && centroById(slot.cd);
+  const rack = cd?.planta?.prateleiras.find((r) => r.id === slot.rua);
+  if (!rack) {
+    els.slotDetail.hidden = true;
+    return;
+  }
+  els.slotDetail.hidden = false;
+  const itens = itensDaPosicao([...(state.estoque.get(cd.id)?.values() ?? [])], slot.rua, slot.posicao);
+  setText('#slot-name', `Rua ${slot.rua} · posição ${String(slot.posicao).padStart(2, '0')}`);
+  setText('#slot-sub', `${cd.nome} · ${itens.length} de ${rack.niveis} níveis ocupados`);
+  const list = $('#slot-niveis');
+  const signature = JSON.stringify(itens.map((i) => [i.endereco, i.quantidade, i.sku, i.lote]));
+  if (list.dataset.sig === signature) return;
+  list.dataset.sig = signature;
+  const now = Date.now();
+  const porNivel = new Map(itens.map((i) => [parseEndereco(i.endereco).nivel, i]));
+  const niveis = [];
+  for (let n = rack.niveis; n >= 1; n--) niveis.push(nivelItem(n, porNivel.get(n), now));
+  list.replaceChildren(...niveis);
+}
+
+/** Seleciona uma posição de prateleira. `open`: abre a planta do CD dela. */
+function selectSlot(slot, { open = false } = {}) {
+  if (slot) {
+    select(null);
+    state.selectedCd = null;
+    geo?.setSelectedCd(null);
+    if (open || state.space?.id !== slot.cd) {
+      showSpace(slot.cd);
+      setView('indoor');
+    }
+  }
+  state.selectedSlot = slot;
+  $('#slot-niveis').dataset.sig = '';
   refreshUi();
 }
 
@@ -672,9 +856,17 @@ function bindEvents() {
     selectCd(id);
   });
   $('#sair').addEventListener('click', logout);
+  $('#slot-close').addEventListener('click', () => selectSlot(null));
+  $('#estoque-busca-list').addEventListener('click', (e) => {
+    const row = e.target.closest('[data-endereco]');
+    if (!row) return;
+    const end = parseEndereco(row.dataset.endereco);
+    selectSlot({ cd: row.dataset.cd, rua: end.rua, posicao: end.posicao }, { open: true });
+  });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (state.selectedId) select(null);
+    else if (state.selectedSlot) selectSlot(null);
     else if (state.selectedCd) selectCd(null);
   });
 }
@@ -751,7 +943,12 @@ async function boot() {
   buildCdPicker();
   bindEvents();
 
-  indoor = new IndoorView($('#indoor'), els.indoorCanvas, { onSelect: select });
+  indoor = new IndoorView($('#indoor'), els.indoorCanvas, {
+    onSelect: select,
+    onSelectSlot: (cell) => selectSlot(cell && state.space ? { cd: state.space.id, ...cell } : null),
+  });
+  // Estoque de todos os CDs com prateleiras: a busca de produto olha a rede inteira.
+  Promise.all(comPlanta.map((c) => loadEstoque(c.id))).then(refreshUi);
   if (comPlanta.length) showSpace(comPlanta[0].id);
   else els.views.find((b) => b.dataset.view === 'indoor').disabled = true;
 

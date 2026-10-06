@@ -1,7 +1,9 @@
 // Visualização da planta de um CD em <canvas>. Coordenadas em metros; y cresce para cima.
 // Veículos no pátio do CD aparecem encostados nas docas (lado sul, y < 0), na ordem do id;
 // os que não cabem nas docas aparecem como "aguardando doca" numa linha de texto.
+// Prateleiras: cada posição é uma célula colorida pelos níveis ocupados; clicar abre os níveis.
 import { drawGlyph } from './icons.js';
+import { posicaoKey } from './estoque.js';
 
 const ZONE_FILL = {
   doca: '#e3ece6',
@@ -12,6 +14,9 @@ const ZONE_FILL = {
 const PAD = 28;
 const PAD_BOTTOM = 112; // espaço do pátio, abaixo das docas
 const DOCK_Y = -4; // metros: logo fora da parede, em frente à porta
+// Cor da posição pela fração de níveis ocupados (vazio → cheio).
+const OCUPACAO_FILL = ['#eceee8', '#cdd8e1', '#a5b9ca', '#7a95ae', '#4f6d8a'];
+const DESTAQUE_FILL = '#f2b705';
 const VIAGEM_CURTA = { carregando: 'carregando', descarregando: 'descarregando', em_transito: 'saindo', planejada: 'aguardando' };
 export class IndoorView {
   constructor(wrap, canvas, handlers) {
@@ -25,6 +30,8 @@ export class IndoorView {
     this.lastItems = [];
     this.layout = { scale: 1, ox: 0, oy: 0 };
     this.insets = { top: 0, bottom: 0, right: 0 }; // áreas cobertas por painéis flutuantes
+    // Estoque da planta: Map "A-03" → níveis ocupados, posições em destaque (busca) e a selecionada.
+    this.estoque = { ocupacao: new Map(), destaque: new Set(), selecionada: null };
 
     new ResizeObserver(() => this.resize()).observe(wrap);
     canvas.addEventListener('click', (e) => this.#onClick(e));
@@ -37,6 +44,23 @@ export class IndoorView {
 
   setSelected(id) {
     this.selectedId = id;
+  }
+
+  setEstoque(ocupacao, destaque = new Set(), selecionada = null) {
+    this.estoque = { ocupacao, destaque, selecionada };
+  }
+
+  /** Células (posições) de uma prateleira, em metros, ao longo do lado maior. */
+  static cells(r) {
+    const horizontal = r.w >= r.h;
+    const passo = (horizontal ? r.w : r.h) / r.posicoes;
+    return Array.from({ length: r.posicoes }, (_, i) => ({
+      posicao: i + 1,
+      x: horizontal ? r.x + i * passo : r.x,
+      y: horizontal ? r.y : r.y + i * passo,
+      w: horizontal ? passo : r.w,
+      h: horizontal ? r.h : passo,
+    }));
   }
 
   /** points: [[x, y, ts], ...] */
@@ -130,7 +154,12 @@ export class IndoorView {
       ctx.fillStyle = ZONE_FILL[z.tipo] ?? '#f3f4f0';
       ctx.fillRect(this.#sx(z.x), this.#sy(z.y + z.h), z.w * scale, z.h * scale);
       ctx.fillStyle = 'rgba(24, 40, 44, 0.55)';
-      ctx.fillText(z.nome, this.#sx(z.x) + 8, this.#sy(z.y + z.h) + 6);
+      // Canto inferior direito: à esquerda ficam as letras das ruas e no topo as pontas das prateleiras.
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(z.nome, this.#sx(z.x + z.w) - 8, this.#sy(z.y) - 4);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
     }
 
     // grade de 10 m
@@ -147,12 +176,39 @@ export class IndoorView {
     }
     ctx.stroke();
 
-    // prateleiras
+    // prateleiras: uma célula por posição, cor pela ocupação dos níveis
+    const { ocupacao, destaque, selecionada } = this.estoque;
+    ctx.font = '700 12px "Public Sans", system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
     for (const r of space.prateleiras) {
-      ctx.fillStyle = '#c9cfc6';
-      ctx.fillRect(this.#sx(r.x), this.#sy(r.y + r.h), r.w * scale, r.h * scale);
-      ctx.strokeStyle = '#aab2a8';
+      for (const c of IndoorView.cells(r)) {
+        const key = posicaoKey(r.id, c.posicao);
+        const ocupados = Math.min(r.niveis, ocupacao.get(key) ?? 0);
+        const idx = Math.round((ocupados / r.niveis) * (OCUPACAO_FILL.length - 1));
+        const px = this.#sx(c.x);
+        const py = this.#sy(c.y + c.h);
+        ctx.fillStyle = destaque.has(key) ? DESTAQUE_FILL : OCUPACAO_FILL[idx];
+        ctx.fillRect(px, py, c.w * scale, c.h * scale);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px + 0.5, py + 0.5, c.w * scale - 1, c.h * scale - 1);
+      }
+      ctx.strokeStyle = '#8796a3';
+      ctx.lineWidth = 1;
       ctx.strokeRect(this.#sx(r.x), this.#sy(r.y + r.h), r.w * scale, r.h * scale);
+      ctx.fillStyle = '#18282c';
+      ctx.textAlign = 'right';
+      ctx.fillText(r.id, this.#sx(r.x) - 6, this.#sy(r.y + r.h / 2));
+      ctx.textAlign = 'left';
+    }
+    if (selecionada) {
+      const r = space.prateleiras.find((p) => p.id === selecionada.rua);
+      const c = r && IndoorView.cells(r)[selecionada.posicao - 1];
+      if (c) {
+        ctx.strokeStyle = '#0a6b4b';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(this.#sx(c.x) - 1, this.#sy(c.y + c.h) - 1, c.w * scale + 2, c.h * scale + 2);
+      }
     }
 
     // paredes e portas das docas
@@ -184,6 +240,27 @@ export class IndoorView {
     ctx.fillStyle = '#18282c';
     ctx.textBaseline = 'middle';
     ctx.fillText('10 m', barX + 10 * scale + 8, barY);
+
+    // legenda da ocupação, à direita da escala
+    ctx.font = '500 11px "Public Sans", system-ui, sans-serif';
+    const box = 10;
+    const legendaW = ctx.measureText('Níveis ocupados: vazio').width + 6 + OCUPACAO_FILL.length * (box + 3) + ctx.measureText('cheio').width + 2;
+    const livre = this.#sx(space.largura) - (barX + 10 * scale + 50);
+    if (space.prateleiras.length && legendaW <= livre) {
+      const right = this.#sx(space.largura) - ctx.measureText('cheio').width - 2;
+      let x = right - OCUPACAO_FILL.length * (box + 3);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#51646a';
+      ctx.fillText('Níveis ocupados: vazio', x - 6, barY);
+      ctx.textAlign = 'left';
+      for (const color of OCUPACAO_FILL) {
+        ctx.fillStyle = color;
+        ctx.fillRect(x, barY - box / 2, box, box);
+        x += box + 3;
+      }
+      ctx.fillStyle = '#51646a';
+      ctx.fillText('cheio', x + 2, barY);
+    }
 
     // rastro do ativo selecionado
     if (this.trail.length > 1) {
@@ -271,6 +348,22 @@ export class IndoorView {
     ctx.textAlign = 'left';
   }
 
+  /** Posição de prateleira sob o ponto (px da tela), ou null. */
+  #cellAt(mx, my) {
+    if (!this.space) return null;
+    const { scale } = this.layout;
+    for (const r of this.space.prateleiras) {
+      for (const c of IndoorView.cells(r)) {
+        const px = this.#sx(c.x);
+        const py = this.#sy(c.y + c.h);
+        if (mx >= px && mx <= px + c.w * scale && my >= py && my <= py + c.h * scale) {
+          return { rua: r.id, posicao: c.posicao };
+        }
+      }
+    }
+    return null;
+  }
+
   #onClick(e) {
     const rect = this.canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
@@ -284,6 +377,10 @@ export class IndoorView {
         bestDist = d;
       }
     }
-    this.handlers.onSelect(best ? best.id : null);
+    // Veículo bem em cima do clique ganha; senão a prateleira; senão o veículo mais perto.
+    const cell = this.#cellAt(mx, my);
+    if (best && (bestDist < 12 || !cell)) return this.handlers.onSelect(best.id);
+    if (cell) return this.handlers.onSelectSlot?.(cell);
+    this.handlers.onSelect(null);
   }
 }

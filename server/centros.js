@@ -9,22 +9,46 @@ const RAIO_PADRAO_M = 300;
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const text = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
+const RUA_RE = /^[A-Z0-9]{1,4}$/;
+const LETRAS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const intIn = (v, min, max, fallback) => (Number.isInteger(v) && v >= min && v <= max ? v : fallback);
+
+/**
+ * Prateleira (rua de porta-paletes): retângulo + id da rua, posições ao longo do lado maior e níveis.
+ * Sem id, recebe A, B, C... na ordem da lista; sem posições, uma a cada ~5 m; sem níveis, 4.
+ */
+function normalizeRack(r, i) {
+  const comprimento = Math.max(r.w, r.h);
+  const id = typeof r.id === 'string' && RUA_RE.test(r.id.trim().toUpperCase()) ? r.id.trim().toUpperCase() : LETRAS[i] ?? `R${i + 1}`;
+  return {
+    id,
+    posicoes: intIn(r.posicoes, 1, 200, Math.max(1, Math.round(comprimento / 5))),
+    niveis: intIn(r.niveis, 1, 20, 4),
+  };
+}
+
 /** Planta: { largura, altura (m), zonas[], portas[], prateleiras[] }. Descarta o que não for número. */
 function normalizePlanta(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const largura = num(raw.largura);
   const altura = num(raw.altura);
   if (!(largura > 0 && altura > 0 && largura <= 5000 && altura <= 5000)) return null;
-  const rects = (list, extra = () => ({})) =>
+  const validRects = (list) =>
     (Array.isArray(list) ? list : [])
       .slice(0, 500)
-      .filter((r) => r && [r.x, r.y, r.w, r.h].every((v) => num(v) !== null))
-      .map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h, ...extra(r) }));
+      .filter((r) => r && [r.x, r.y, r.w, r.h].every((v) => num(v) !== null) && r.w > 0 && r.h > 0);
+  const rects = (list, extra = () => ({})) =>
+    validRects(list).map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h, ...extra(r) }));
+  // Rua repetida invalidaria o endereçamento: fica só a primeira.
+  const racks = (list) =>
+    rects(list, (r) => r)
+      .map((r, i) => ({ x: r.x, y: r.y, w: r.w, h: r.h, ...normalizeRack(r, i) }))
+      .filter((r, i, all) => all.findIndex((o) => o.id === r.id) === i);
   return {
     largura,
     altura,
     zonas: rects(raw.zonas, (z) => ({ nome: text(z.nome, 40), tipo: text(z.tipo, 20) })),
-    prateleiras: rects(raw.prateleiras),
+    prateleiras: racks(raw.prateleiras),
     portas: (Array.isArray(raw.portas) ? raw.portas : [])
       .slice(0, 100)
       .filter((p) => p && num(p.x) !== null && num(p.w) !== null)
