@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FrotaLogIA</title>
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/vendor/maplibre-gl/maplibre-gl.css">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="panel" aria-label="Ativos">
+      <header class="brand">
+        <h1>FrotaLogIA <small id="version" class="version"></small></h1>
+        <span id="conn" class="conn" data-state="connecting" role="status">Conectando…</span>
+      </header>
+
+      <section class="summary" aria-label="Resumo da frota">
+        <p class="total"><strong id="count-total">0</strong> ativos rastreados</p>
+        <div class="bar" id="status-bar" aria-hidden="true">
+          <span class="seg" data-status="movimento"></span>
+          <span class="seg" data-status="parado"></span>
+          <span class="seg" data-status="offline"></span>
+        </div>
+        <ul class="legend">
+          <li><i class="dot" data-status="movimento"></i><b id="count-movimento">0</b> em movimento</li>
+          <li><i class="dot" data-status="parado"></i><b id="count-parado">0</b> parados</li>
+          <li><i class="dot" data-status="offline"></i><b id="count-offline">0</b> sem sinal</li>
+        </ul>
+      </section>
+
+      <div class="views" role="tablist" aria-label="Visualização">
+        <button type="button" role="tab" data-view="map" aria-selected="true">Mapa</button>
+        <button type="button" role="tab" data-view="indoor" aria-selected="false">Galpão</button>
+      </div>
+
+      <div class="filters">
+        <label class="search">
+          <span class="sr-only">Buscar ativo</span>
+          <input id="search" type="search" placeholder="Buscar por nome ou código" autocomplete="off">
+        </label>
+        <div id="type-filters" class="chips" role="group" aria-label="Filtrar por tipo"></div>
+      </div>
+
+      <ul id="asset-list" class="list"></ul>
+      <p id="empty" class="empty" hidden></p>
+    </aside>
+
+    <main class="stage">
+      <div id="map" aria-label="Mapa da frota"></div>
+      <div id="indoor" hidden>
+        <canvas id="indoor-canvas" aria-label="Planta do galpão"></canvas>
+      </div>
+
+      <button id="fit" class="pill" type="button">Enquadrar frota</button>
+
+      <section id="detail" class="detail" aria-live="off" hidden>
+        <header>
+          <span id="detail-glyph" class="glyph"></span>
+          <div class="titles">
+            <h2 id="detail-name"></h2>
+            <p id="detail-id"></p>
+          </div>
+          <button id="detail-close" class="close" type="button" aria-label="Fechar detalhes">Fechar</button>
+        </header>
+        <dl>
+          <div><dt>Situação</dt><dd id="detail-status"></dd></div>
+          <div><dt>Velocidade</dt><dd id="detail-speed"></dd></div>
+          <div><dt>Rumo</dt><dd id="detail-heading"></dd></div>
+          <div class="secondary"><dt>Atualizado</dt><dd id="detail-age"></dd></div>
+          <div class="wide secondary"><dt>Posição</dt><dd id="detail-pos"></dd></div>
+        </dl>
+        <div class="toggles">
+          <label id="follow-wrap"><input id="follow" type="checkbox"> Seguir no mapa</label>
+          <label><input id="trail" type="checkbox" checked> Mostrar rastro</label>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

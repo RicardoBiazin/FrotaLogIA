@@ -1,0 +1,21 @@
+{
+  "name": "frotalogia",
+  "version": "0.2.0",
+  "description": "Rastreamento de ativos em tempo real (caminhões, carros, empilhadeiras e qualquer objeto com posição) com animação suave.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "dev": "node --watch server/index.js",
+    "start": "node server/index.js",
+    "test": "node --test",
+    "device": "node scripts/fake-device.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "maplibre-gl": "^6.12.0",
+    "ws": "^8.18.0"
+  }
+}
