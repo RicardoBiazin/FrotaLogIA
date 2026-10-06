@@ -1,10 +1,11 @@
 // Aplicação Express: API REST + arquivos estáticos.
-import crypto from 'node:crypto';
+// Toda rota de dados exige a chave do cliente (header x-api-key) e só enxerga a rede dele.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { publicAsset } from './store.js';
 import { TIPOS } from './normalize.js';
+import { VIAGEM_STATUS } from './viagens.js';
 import { traccarToPositions } from './adapters/traccar.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -37,87 +38,133 @@ function securityHeaders(_req, res, next) {
   next();
 }
 
-function safeEqual(a, b) {
-  const ha = crypto.createHash('sha256').update(String(a)).digest();
-  const hb = crypto.createHash('sha256').update(String(b)).digest();
-  return crypto.timingSafeEqual(ha, hb);
-}
+/** CD como o navegador precisa: a planta já vem no formato da IndoorView. */
+const publicCentro = (c) => ({
+  id: c.id,
+  nome: c.nome,
+  endereco: c.endereco,
+  lat: c.lat,
+  lon: c.lon,
+  raioM: c.raioM,
+  planta: c.planta ? { ...c.planta, id: c.id, nome: c.nome } : null,
+});
 
-export function createApp({ config, store, ingest, spaces, version = null }) {
+export function createApp({ config, store, viagens, eventos, ingest, tenants, version = null }) {
   const app = express();
   app.disable('x-powered-by');
   app.use(securityHeaders);
 
-  const requireKey = (req, res, next) => {
-    if (!config.apiKey) return next(); // modo desenvolvimento: sem chave configurada
-    if (safeEqual(req.get('x-api-key') ?? '', config.apiKey)) return next();
-    res.status(401).json({ erro: 'x-api-key ausente ou inválida' });
+  /** Resolve o cliente pela chave; sem chave válida, 401. */
+  const requireTenant = (req, res, next) => {
+    const tenant = tenants.resolve(req.get('x-api-key') ?? '');
+    if (!tenant) return res.status(401).json({ erro: 'x-api-key ausente ou inválida' });
+    req.cliente = tenant.id;
+    req.tenant = tenant;
+    next();
   };
 
   const api = express.Router();
   api.use(express.json({ limit: '1mb' }));
+  api.use((_req, res, next) => {
+    res.set('Cache-Control', 'no-store'); // dados de rastreamento não ficam em cache
+    next();
+  });
 
+  // ---- Públicas: só o necessário para a tela de acesso e para monitoramento ----
   api.get('/health', (_req, res) => {
-    res.json({ ok: true, versao: version, ativos: store.assets.size, agora: Date.now() });
+    res.json({ ok: true, versao: version, agora: Date.now() });
   });
 
   api.get('/config', (_req, res) => {
     res.json({
       versao: version,
+      auth: !tenants.open,
       mapStyleUrl: config.mapStyleUrl || null,
       mapLabelFont: config.mapLabelFont || null,
       center: config.mapCenter,
       zoom: config.mapZoom,
       offlineAfterMs: config.offlineAfterMs,
       tipos: TIPOS,
+      viagemStatus: VIAGEM_STATUS,
     });
   });
 
-  api.get('/spaces', (_req, res) => res.json(spaces));
+  // ---- Do cliente ----
+  api.use(requireTenant);
+
+  api.get('/sessao', (req, res) => res.json({ cliente: { id: req.tenant.id, nome: req.tenant.nome } }));
+
+  api.get('/centros', (req, res) => res.json(req.tenant.centros.map(publicCentro)));
 
   api.get('/assets', (req, res) => {
     const { tipo, espaco } = req.query;
-    res.json(store.list({ tipo, espaco }).map(publicAsset));
+    res.json(store.list(req.cliente, { tipo, espaco }).map(publicAsset));
   });
 
   api.get('/assets/:id', (req, res) => {
-    const asset = store.get(req.params.id);
+    const asset = store.get(req.cliente, req.params.id);
     if (!asset) return res.status(404).json({ erro: 'ativo não encontrado' });
-    res.json(publicAsset(asset));
+    res.json({ ...publicAsset(asset), viagem: viagens.ativaDoVeiculo(req.cliente, asset.id) });
   });
 
   api.get('/assets/:id/trail', (req, res) => {
-    const trail = store.trail(req.params.id);
+    const trail = store.trail(req.cliente, req.params.id);
     if (!trail) return res.status(404).json({ erro: 'ativo não encontrado' });
     res.json(trail);
   });
 
-  const ingestMany = (items, res) => {
+  api.get('/viagens', (req, res) => {
+    const { status, veiculo } = req.query;
+    res.json(
+      viagens.list(req.cliente, {
+        status: typeof status === 'string' ? status : undefined,
+        veiculo: typeof veiculo === 'string' ? veiculo : undefined,
+        ativas: req.query.ativas === 'true',
+      }),
+    );
+  });
+
+  api.get('/viagens/:id', (req, res) => {
+    const viagem = viagens.get(req.cliente, req.params.id);
+    if (!viagem) return res.status(404).json({ erro: 'viagem não encontrada' });
+    res.json(viagem);
+  });
+
+  api.get('/eventos', (req, res) => {
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
+    res.json(eventos.list(req.cliente, limit));
+  });
+
+  const ingestMany = (items, res, fn) => {
     if (items.length > MAX_BATCH) {
-      return res.status(413).json({ erro: `máximo de ${MAX_BATCH} posições por requisição` });
+      return res.status(413).json({ erro: `máximo de ${MAX_BATCH} itens por requisição` });
     }
     const rejected = [];
     let accepted = 0;
     items.forEach((item, index) => {
-      const result = ingest(item);
+      const result = fn(item);
       if (result.ok) accepted++;
       else rejected.push({ index, erro: result.error });
     });
     // 202 mesmo com rejeições parciais; o corpo detalha o que falhou.
     res.status(accepted > 0 || items.length === 0 ? 202 : 400).json({ accepted, rejected });
   };
+  const asList = (body) => (Array.isArray(body) ? body : [body]);
 
-  api.post('/positions', requireKey, (req, res) => {
-    const body = req.body;
-    ingestMany(Array.isArray(body) ? body : [body], res);
+  api.post('/positions', (req, res) => {
+    ingestMany(asList(req.body), res, (item) => ingest.position(req.cliente, item));
   });
 
-  api.post('/ingest/traccar', requireKey, (req, res) => {
-    ingestMany(traccarToPositions(req.body), res);
+  api.post('/ingest/traccar', (req, res) => {
+    ingestMany(traccarToPositions(req.body), res, (item) => ingest.position(req.cliente, item));
   });
 
-  api.delete('/assets/:id', requireKey, (req, res) => {
-    if (!store.remove(req.params.id)) return res.status(404).json({ erro: 'ativo não encontrado' });
+  api.post('/viagens', (req, res) => {
+    ingestMany(asList(req.body), res, (item) => ingest.trip(req.cliente, item));
+  });
+
+  api.delete('/assets/:id', (req, res) => {
+    if (!store.remove(req.cliente, req.params.id)) return res.status(404).json({ erro: 'ativo não encontrado' });
     res.status(204).end();
   });
 

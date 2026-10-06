@@ -1,7 +1,8 @@
-// Armazenamento em memória da última posição de cada ativo + rastro recente.
+// Armazenamento em memória da última posição de cada ativo + rastro recente, separado
+// por cliente (o mesmo id pode existir em clientes diferentes sem conflito).
 //
 // Para produção, esta classe é o ponto de troca: mantenha a mesma interface
-// (upsert, get, list, trail, remove, sweep, eventos 'update'/'remove') e implemente
+// (upsert, get, list, trail, remove, sweep, count, eventos 'update'/'remove') e implemente
 // com Redis (última posição) + PostGIS/TimescaleDB (histórico).
 import { EventEmitter } from 'node:events';
 import { bearing, bearingLocal, distanceMeters } from './geo.js';
@@ -13,6 +14,7 @@ const MIN_MOVE_FOR_HEADING_M = 1;
 export function publicAsset(a) {
   return {
     id: a.id,
+    cd: a.cd ?? null, // CD onde o veículo está (cerca), ou null
     nome: a.nome,
     tipo: a.tipo,
     espaco: a.espaco,
@@ -35,8 +37,21 @@ export class AssetStore extends EventEmitter {
     this.offlineAfterMs = offlineAfterMs;
     this.trailMax = trailMax;
     this.maxAssets = maxAssets;
-    this.assets = new Map();
-    this.trails = new Map();
+    this.clientes = new Map(); // cliente → { assets: Map<id, asset>, trails: Map<id, ponto[]> }
+    this.total = 0;
+  }
+
+  #bucket(cliente, create = false) {
+    let b = this.clientes.get(cliente);
+    if (!b && create) {
+      b = { assets: new Map(), trails: new Map() };
+      this.clientes.set(cliente, b);
+    }
+    return b ?? null;
+  }
+
+  count(cliente) {
+    return cliente === undefined ? this.total : (this.#bucket(cliente)?.assets.size ?? 0);
   }
 
   #status(asset, now) {
@@ -54,12 +69,12 @@ export class AssetStore extends EventEmitter {
     return moved >= MIN_MOVE_FOR_HEADING_M ? bearing(prev.lat, prev.lon, next.lat, next.lon) : prev.rumo;
   }
 
-  #pushTrail(asset, prev) {
-    let trail = this.trails.get(asset.id);
+  #pushTrail(trails, asset, prev) {
+    let trail = trails.get(asset.id);
     // Trocou de mapa para planta (ou de planta): as coordenadas não se misturam.
     if (!trail || (prev && (prev.espaco ?? null) !== (asset.espaco ?? null))) {
       trail = [];
-      this.trails.set(asset.id, trail);
+      trails.set(asset.id, trail);
     }
     const a = asset.espaco ? asset.x : asset.lon;
     const b = asset.espaco ? asset.y : asset.lat;
@@ -69,11 +84,12 @@ export class AssetStore extends EventEmitter {
     if (trail.length > this.trailMax) trail.splice(0, trail.length - this.trailMax);
   }
 
-  /** Recebe um ativo já normalizado (ver normalize.js). */
+  /** Recebe um ativo já normalizado (ver normalize.js), com `cliente` definido. */
   upsert(input, now = Date.now()) {
-    const prev = this.assets.get(input.id);
+    const cliente = input.cliente;
+    const prev = this.get(cliente, input.id);
     if (prev && input.ts < prev.ts) return { stored: false, reason: 'posição mais antiga que a já armazenada' };
-    if (!prev && this.assets.size >= this.maxAssets) {
+    if (!prev && this.total >= this.maxAssets) {
       return { stored: false, reason: `limite de ${this.maxAssets} ativos atingido; remova ativos ou aumente MAX_ASSETS` };
     }
 
@@ -81,46 +97,53 @@ export class AssetStore extends EventEmitter {
     if (asset.rumo === null) asset.rumo = this.#deriveHeading(prev, asset);
     asset.status = this.#status(asset, now);
 
-    this.assets.set(asset.id, asset);
-    this.#pushTrail(asset, prev);
+    const bucket = this.#bucket(cliente, true);
+    bucket.assets.set(asset.id, asset);
+    if (!prev) this.total++;
+    this.#pushTrail(bucket.trails, asset, prev);
     this.emit('update', asset);
-    return { stored: true, asset };
+    return { stored: true, asset, prev };
   }
 
-  get(id) {
-    return this.assets.get(id) ?? null;
+  get(cliente, id) {
+    return this.#bucket(cliente)?.assets.get(id) ?? null;
   }
 
-  list({ tipo, espaco } = {}) {
-    let items = [...this.assets.values()];
-    if (tipo) items = items.filter((a) => a.tipo === tipo);
-    if (espaco) items = items.filter((a) => a.espaco === espaco);
+  list(cliente, { tipo, espaco } = {}) {
+    let items = [...(this.#bucket(cliente)?.assets.values() ?? [])];
+    if (typeof tipo === 'string' && tipo) items = items.filter((a) => a.tipo === tipo);
+    if (typeof espaco === 'string' && espaco) items = items.filter((a) => a.espaco === espaco);
     return items;
   }
 
   /** { espaco, points: [[lon,lat,ts] | [x,y,ts], ...] } ou null se o ativo não existe. */
-  trail(id) {
-    const asset = this.assets.get(id);
+  trail(cliente, id) {
+    const asset = this.get(cliente, id);
     if (!asset) return null;
-    return { espaco: asset.espaco, points: this.trails.get(id) ?? [] };
+    return { espaco: asset.espaco, points: this.#bucket(cliente).trails.get(id) ?? [] };
   }
 
-  remove(id) {
-    const existed = this.assets.delete(id);
-    this.trails.delete(id);
-    if (existed) this.emit('remove', id);
-    return existed;
+  remove(cliente, id) {
+    const bucket = this.#bucket(cliente);
+    const existed = bucket?.assets.delete(id) ?? false;
+    if (!existed) return false;
+    bucket.trails.delete(id);
+    this.total--;
+    this.emit('remove', cliente, id);
+    return true;
   }
 
   /** Reavalia status (ex.: virou "offline"). Emite 'update' só dos que mudaram. */
   sweep(now = Date.now()) {
     let changed = 0;
-    for (const asset of this.assets.values()) {
-      const status = this.#status(asset, now);
-      if (status !== asset.status) {
-        asset.status = status;
-        changed++;
-        this.emit('update', asset);
+    for (const { assets } of this.clientes.values()) {
+      for (const asset of assets.values()) {
+        const status = this.#status(asset, now);
+        if (status !== asset.status) {
+          asset.status = status;
+          changed++;
+          this.emit('update', asset);
+        }
       }
     }
     return changed;

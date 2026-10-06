@@ -13,9 +13,12 @@
 </head>
 <body>
   <div class="app">
-    <aside class="panel" aria-label="Ativos">
+    <aside class="panel" aria-label="Frota">
       <header class="brand">
-        <h1>FrotaLogIA <small id="version" class="version"></small></h1>
+        <div>
+          <h1>FrotaLogIA <small id="version" class="version"></small></h1>
+          <p class="cliente"><span id="cliente-nome"></span> <button id="sair" class="link" type="button" hidden>Sair</button></p>
+        </div>
         <span id="conn" class="conn" data-state="connecting" role="status">Conectando…</span>
       </header>
 
@@ -31,33 +34,45 @@
           <li><i class="dot" data-status="parado"></i><b id="count-parado">0</b> parados</li>
           <li><i class="dot" data-status="offline"></i><b id="count-offline">0</b> sem sinal</li>
         </ul>
+        <p class="kpis"><b id="kpi-viagens">0</b> viagens ativas · <b id="kpi-peso">0 t</b> em trânsito · <b id="kpi-cds">0</b> CDs</p>
       </section>
 
       <div class="views" role="tablist" aria-label="Visualização">
         <button type="button" role="tab" data-view="map" aria-selected="true">Mapa</button>
-        <button type="button" role="tab" data-view="indoor" aria-selected="false">Galpão</button>
+        <button type="button" role="tab" data-view="indoor" aria-selected="false">Centros</button>
       </div>
 
       <div class="filters">
         <label class="search">
-          <span class="sr-only">Buscar ativo</span>
-          <input id="search" type="search" placeholder="Buscar por nome ou código" autocomplete="off">
+          <span class="sr-only">Buscar</span>
+          <input id="search" type="search" placeholder="Buscar veículo, carga, destino, cliente…" autocomplete="off">
         </label>
         <div id="type-filters" class="chips" role="group" aria-label="Filtrar por tipo"></div>
       </div>
 
-      <ul id="asset-list" class="list"></ul>
+      <details id="eventos" class="events" open>
+        <summary>Movimentação nos CDs <b id="eventos-count">0</b></summary>
+        <ol id="eventos-list"></ol>
+        <p id="eventos-empty" class="muted">Nenhuma entrada ou saída ainda.</p>
+      </details>
+
+      <ul id="asset-list" class="list" aria-label="Veículos e equipamentos"></ul>
       <p id="empty" class="empty" hidden></p>
     </aside>
 
     <main class="stage">
       <div id="map" aria-label="Mapa da frota"></div>
       <div id="indoor" hidden>
-        <canvas id="indoor-canvas" aria-label="Planta do galpão"></canvas>
+        <canvas id="indoor-canvas" aria-label="Planta do centro de distribuição"></canvas>
       </div>
 
       <button id="fit" class="pill" type="button">Enquadrar frota</button>
+      <label id="cd-picker" class="pill picker" hidden>
+        <span class="sr-only">Centro de distribuição</span>
+        <select id="cd-select"></select>
+      </label>
 
+      <!-- Veículo / equipamento -->
       <section id="detail" class="detail" aria-live="off" hidden>
         <header>
           <span id="detail-glyph" class="glyph"></span>
@@ -72,14 +87,71 @@
           <div><dt>Velocidade</dt><dd id="detail-speed"></dd></div>
           <div><dt>Rumo</dt><dd id="detail-heading"></dd></div>
           <div class="secondary"><dt>Atualizado</dt><dd id="detail-age"></dd></div>
+          <div class="wide" id="detail-cd-wrap"><dt>Local</dt><dd><button id="detail-cd" class="link" type="button"></button></dd></div>
           <div class="wide secondary"><dt>Posição</dt><dd id="detail-pos"></dd></div>
         </dl>
+
+        <section id="trip" class="trip" aria-label="Transporte" hidden>
+          <h3><span id="trip-id"></span> <span id="trip-status" class="badge"></span></h3>
+          <p class="route"><span id="trip-origem"></span><span class="arrow" aria-hidden="true">→</span><span id="trip-destino"></span></p>
+          <dl>
+            <div class="wide"><dt>Carga</dt><dd id="trip-carga"></dd></div>
+            <div><dt>Peso</dt><dd id="trip-peso"></dd></div>
+            <div><dt>Volume</dt><dd id="trip-volume"></dd></div>
+            <div><dt>Volumes</dt><dd id="trip-volumes"></dd></div>
+            <div><dt>Valor</dt><dd id="trip-valor"></dd></div>
+            <div class="wide"><dt>Previsão de chegada</dt><dd id="trip-previsao"></dd></div>
+            <div class="wide"><dt>Remetente</dt><dd id="trip-remetente"></dd></div>
+            <div class="wide"><dt>Destinatário</dt><dd id="trip-destinatario"></dd></div>
+            <div class="wide secondary"><dt>Documento</dt><dd id="trip-documento"></dd></div>
+          </dl>
+        </section>
+        <p id="no-trip" class="muted" hidden>Sem viagem ativa.</p>
+
         <div class="toggles">
           <label id="follow-wrap"><input id="follow" type="checkbox"> Seguir no mapa</label>
           <label><input id="trail" type="checkbox" checked> Mostrar rastro</label>
         </div>
       </section>
+
+      <!-- Centro de distribuição -->
+      <section id="cd-detail" class="detail" aria-live="off" hidden>
+        <header>
+          <span class="glyph cd-glyph" aria-hidden="true"></span>
+          <div class="titles">
+            <h2 id="cd-name"></h2>
+            <p id="cd-endereco"></p>
+          </div>
+          <button id="cd-close" class="close" type="button" aria-label="Fechar centro de distribuição">Fechar</button>
+        </header>
+        <dl class="stats">
+          <div><dt>No pátio</dt><dd id="cd-patio">0</dd></div>
+          <div><dt>A caminho</dt><dd id="cd-chegando">0</dd></div>
+          <div><dt>Empilhadeiras</dt><dd id="cd-empilhadeiras">0</dd></div>
+        </dl>
+        <h3 class="sub">No pátio</h3>
+        <ul id="cd-patio-list" class="mini"></ul>
+        <h3 class="sub">A caminho</h3>
+        <ul id="cd-chegando-list" class="mini"></ul>
+        <h3 class="sub">Últimas movimentações</h3>
+        <ul id="cd-eventos-list" class="mini"></ul>
+        <div class="toggles">
+          <button id="cd-planta" class="action" type="button">Abrir planta</button>
+          <button id="cd-mapa" class="action secondary-action" type="button">Ver no mapa</button>
+        </div>
+      </section>
     </main>
+  </div>
+
+  <div id="login" class="login" hidden>
+    <form id="login-form" class="login-card">
+      <h2>FrotaLogIA</h2>
+      <p>Informe a chave de acesso da sua empresa.</p>
+      <label for="login-chave">Chave de acesso</label>
+      <input id="login-chave" type="password" autocomplete="current-password" required>
+      <p id="login-erro" class="erro" role="alert" hidden></p>
+      <button type="submit" class="action">Entrar</button>
+    </form>
   </div>
   <script type="module" src="/js/main.js"></script>
 </body>

@@ -1,10 +1,13 @@
 # FrotaLogIA
 
-Rastreamento em tempo real de **qualquer objeto com posição**: caminhões, carros, empilhadeiras, reboques, contêineres. Todos usam o mesmo formato de dado; só o ícone e as regras mudam por tipo.
+Logística de transporte em tempo real, **por cliente**: cada empresa vê a própria rede, com todos os veículos na estrada e nos centros de distribuição (CDs).
 
-- **Mapa** (MapLibre GL) para ativos com GPS, com animação suave entre atualizações.
-- **Planta interna** (canvas) para ativos sem GPS, como empilhadeiras em galpão (tags UWB/BLE/Wi‑Fi). Coordenadas em metros.
-- Servidor Node.js com **WebSocket**, API REST de ingestão e **simulador** embutido (11 ativos), para você ver tudo funcionando antes de ligar dados reais.
+- **Mapa** (MapLibre GL) com os veículos animados e os CDs. Cada CD mostra quantos veículos estão no pátio e quantos estão a caminho.
+- **Dados do transporte:** ao clicar num veículo, o card mostra a viagem. Ela traz origem e destino, carga, peso, volume, quantidade de volumes, valor, remetente, destinatário, documento (CT-e) e previsão de chegada.
+- **Centros de distribuição:** clique num CD para ver o pátio, as chegadas previstas e as últimas entradas e saídas. "Abrir planta" mostra o interior, com as empilhadeiras em tempo real e os caminhões encostados nas docas.
+- **Movimentação:** entradas e saídas dos CDs são detectadas sozinhas, por uma cerca virtual em volta de cada CD.
+- **Multi-cliente:** cada empresa entra com a própria chave de acesso e só enxerga a própria frota, tanto na API quanto no WebSocket.
+- **Simulador** com uma rede de exemplo na Grande Florianópolis: 4 CDs, 8 veículos com viagens e 5 empilhadeiras. Assim dá para ver tudo funcionando antes de ligar dados reais.
 
 ## Começando
 
@@ -13,22 +16,44 @@ Requisitos: **Node.js 20.12 ou superior**.
 ```bash
 npm install
 npm run dev        # servidor com reinício automático
-# abra http://localhost:3000 (sem API_KEY, só esta máquina acessa; ver HOST)
+# abra http://localhost:3000
 ```
 
-Na primeira execução o simulador busca o traçado real das ruas no OSRM e guarda em `.cache/routes.json`. Se o OSRM estiver inacessível, ele usa linhas retas e o app continua funcionando.
+Sem configuração, o app roda com o cliente **demo**, sem chave, e o servidor só aceita acesso desta máquina (127.0.0.1). Na primeira execução, o simulador busca o traçado real das ruas no OSRM e guarda em `.cache/routes.json`. Se o OSRM estiver inacessível, ele usa linhas retas.
 
-Outros comandos: `npm start` (sem reinício automático) e `npm test` (testes).
+Outros comandos: `npm start` (sem reinício automático), `npm test` (testes) e `npm run device` (simula um rastreador externo).
 
-## Usando com o Claude Code no VS Code
+## Clientes e chaves de acesso
 
-1. Abra a pasta no VS Code (`code .`) e aceite instalar as extensões recomendadas, incluindo a do Claude Code.
-2. No terminal integrado, rode `claude` na raiz do projeto. O arquivo `CLAUDE.md` já explica a arquitetura, as convenções e o roadmap.
-3. Um bom primeiro pedido: *"Leia o CLAUDE.md, rode `npm install` e `npm test`, e me confirme que tudo passa. Depois implemente o item 1 do roadmap (cercas virtuais)."*
+Cada cliente fica em `data/clientes.json`, que é ignorado pelo git. O arquivo guarda só o **hash** da chave. Para criar um cliente:
 
-## Formato do ativo
+```bash
+npm run cliente -- acme "ACME Transportes"              # cliente novo, sem CDs
+npm run cliente -- demo "Demonstração" --demo           # usa os CDs de exemplo
+npm run cliente -- acme --nova-chave                    # troca a chave
+```
 
-Posição geográfica:
+O comando mostra a chave **uma única vez**. Entregue-a à empresa: é com ela que se entra no painel e se envia dados pela API. Reinicie o servidor depois de mudar o arquivo.
+
+Os CDs de cada cliente ficam no mesmo arquivo:
+
+```json
+[{
+  "id": "acme", "nome": "ACME Transportes", "chaveSha256": "…",
+  "centros": [
+    { "id": "cd-joinville", "nome": "CD Joinville", "endereco": "BR-101, Joinville (SC)",
+      "lat": -26.30, "lon": -48.85, "raioM": 300 }
+  ]
+}]
+```
+
+`raioM` é o raio da cerca, em metros. A planta interna (`planta`) é opcional e segue o formato de `server/demo.js`.
+
+Com o arquivo presente, toda chamada à API e ao WebSocket exige chave, e o servidor passa a escutar em todas as interfaces de rede. Sem o arquivo, `API_KEY` vira a chave do cliente demo.
+
+## Formatos
+
+### Posição de um veículo ou equipamento
 
 ```json
 { "id": "TRK-042", "nome": "Caminhão 42", "tipo": "caminhao",
@@ -36,39 +61,57 @@ Posição geográfica:
   "timestamp": "2026-10-06T14:32:10Z" }
 ```
 
-Posição em planta (ambiente interno):
+Dentro de um CD (planta, sem GPS), `espaco` é o id do CD e `x`/`y` vêm em metros:
 
 ```json
-{ "id": "EMP-001", "tipo": "empilhadeira", "espaco": "galpao-1",
-  "x": 21.4, "y": 11.5, "rumo": 90, "velocidade": 8 }
+{ "id": "EMP-001", "tipo": "empilhadeira", "espaco": "cd-sao-jose", "x": 21.4, "y": 11.5 }
 ```
 
 | Campo | Regra |
 |---|---|
-| `id` | Obrigatório, até 64 caracteres. Identifica o ativo. |
-| `tipo` | `caminhao`, `carro`, `empilhadeira` ou `outro`. Aceita sinônimos (`truck`, `car`, `forklift`...). Desconhecido vira `outro`. |
-| `lat`, `lon` | Graus (WGS84). Obrigatórios fora de planta. |
-| `espaco`, `x`, `y` | Planta interna: `x` para leste e `y` para o norte, em metros, origem no canto inferior esquerdo. |
-| `rumo` | Graus, 0 = norte, sentido horário. **Opcional:** se faltar, o servidor deriva da trajetória. |
-| `velocidade` | km/h. Acima de 2 km/h conta como "em movimento". |
-| `timestamp` (ou `ts`) | ISO 8601 ou epoch em ms ou em segundos (valor abaixo de 10¹¹ é tratado como segundos). Padrão: hora de chegada. Posições mais antigas que a última já recebida são ignoradas. |
-| `atributos` | Objeto livre, até 2 KB em UTF-8 (placa, motorista, carga...). |
+| `id` | Obrigatório, até 64 caracteres. |
+| `tipo` | `caminhao`, `carro`, `empilhadeira` ou `outro`. Aceita sinônimos (`truck`, `van`, `forklift`...). Tipo desconhecido vira `outro`. |
+| `lat`, `lon` | Graus (WGS84). |
+| `espaco`, `x`, `y` | Planta do CD: `x` para leste e `y` para o norte, em metros, origem no canto inferior esquerdo. |
+| `rumo` | Graus, 0 = norte. Opcional: se faltar, o servidor deriva da trajetória. |
+| `velocidade` | km/h. A partir de 2 km/h conta como "em movimento". |
+| `timestamp` (ou `ts`) | ISO 8601 ou epoch em ms ou em segundos. Posições mais antigas que a última recebida são ignoradas. |
+| `atributos` | Objeto livre, até 2 KB (placa, motorista...). |
 
-Um ativo sem novas posições por `OFFLINE_AFTER_S` segundos (60 por padrão) aparece como **sem sinal**.
+### Viagem (dados do transporte)
+
+```json
+{ "id": "VG-1023", "veiculo": "TRK-042", "status": "em_transito", "documento": "CT-e 35123",
+  "origem":  { "nome": "CD Palhoça", "cd": "cd-palhoca" },
+  "destino": { "nome": "Cliente em Tijucas", "lat": -27.24, "lon": -48.63 },
+  "remetente": { "nome": "Indústria Vale Verde", "documento": "12.345.678/0001-90" },
+  "destinatario": { "nome": "Mercado Bela Vista" },
+  "carga": { "descricao": "Bebidas", "pesoKg": 12400, "volumeM3": 38, "volumes": 22, "valor": 150000 },
+  "previsao": "2026-10-06T16:10:00Z" }
+```
+
+- `status` pode ser `planejada`, `carregando`, `em_transito`, `descarregando`, `entregue` ou `cancelada`.
+- Mande a viagem de novo, com o mesmo `id`, sempre que algo mudar (status, previsão).
+- Quando `origem.cd` ou `destino.cd` aponta para um CD, a viagem entra no painel daquele CD.
 
 ## API
 
+Tudo, exceto `/api/config` e `/api/health`, exige o header `x-api-key` com a chave do cliente.
+
 | Método e caminho | O que faz |
 |---|---|
-| `POST /api/positions` | Recebe um objeto ou uma lista (até 1000). Responde `202` com `{ accepted, rejected: [{ index, erro }] }`. |
-| `POST /api/ingest/traccar` | Recebe o encaminhamento de posições do [Traccar](https://www.traccar.org). |
-| `GET /api/assets?tipo=&espaco=` | Lista os ativos com a última posição. |
-| `GET /api/assets/:id` e `/:id/trail` | Um ativo e seu rastro recente. |
+| `POST /api/positions` | Posições: um objeto ou uma lista (até 1000). Responde `202` com `{ accepted, rejected: [{ index, erro }] }`. |
+| `POST /api/viagens` | Viagens: um objeto ou uma lista (até 1000). Mesma resposta. |
+| `POST /api/ingest/traccar` | Encaminhamento de posições do [Traccar](https://www.traccar.org). |
+| `GET /api/assets?tipo=&espaco=` | Veículos e equipamentos com a última posição e o CD onde estão (`cd`). |
+| `GET /api/assets/:id` | Um ativo, com a viagem ativa. `/:id/trail` devolve o rastro recente. |
 | `DELETE /api/assets/:id` | Remove um ativo. |
-| `GET /api/spaces`, `/api/config`, `/api/health` | Plantas, configuração do cliente e saúde (as duas últimas trazem a `versao`). |
-| `WS /ws` | Snapshot ao conectar e depois lotes de atualizações. |
-
-Se `API_KEY` estiver definida, os endpoints de escrita exigem o header `x-api-key`. Os ativos devolvidos trazem `receivedAt` (epoch em ms, relógio do servidor), base do "atualizado há".
+| `GET /api/viagens?status=&veiculo=&ativas=true` e `/api/viagens/:id` | Viagens do cliente. |
+| `GET /api/centros` | CDs do cliente, com a planta. |
+| `GET /api/eventos?limit=` | Últimas entradas e saídas de CD. |
+| `GET /api/sessao` | Qual cliente a chave identifica. |
+| `GET /api/config`, `/api/health` | Configuração da tela e saúde (públicas, sem dados de cliente). |
+| `WS /ws` | Mande `{ "type": "auth", "chave": "…" }`. Em seguida chegam o snapshot do cliente e depois os lotes de atualização. Chave errada fecha com o código 4401. |
 
 ### Enviando uma posição de teste
 
@@ -76,7 +119,7 @@ PowerShell:
 
 ```powershell
 Invoke-RestMethod -Method Post -Uri http://localhost:3000/api/positions `
-  -ContentType 'application/json' `
+  -ContentType 'application/json' -Headers @{ 'x-api-key' = 'SUA_CHAVE' } `
   -Body '{"id":"MEU-01","tipo":"caminhao","lat":-27.59,"lon":-48.55,"velocidade":40}'
 ```
 
@@ -84,27 +127,24 @@ Bash:
 
 ```bash
 curl -X POST http://localhost:3000/api/positions \
-  -H 'content-type: application/json' \
+  -H 'content-type: application/json' -H 'x-api-key: SUA_CHAVE' \
   -d '{"id":"MEU-01","tipo":"caminhao","lat":-27.59,"lon":-48.55,"velocidade":40}'
 ```
 
-Para um dispositivo que se move continuamente, use `npm run device` (ou `node scripts/fake-device.js MEU-02 carro`).
+No modo aberto (cliente demo sem chave), o header pode ser omitido. Para um dispositivo que se move sem parar: `API_KEY=SUA_CHAVE npm run device`.
 
 ### Traccar
 
-No `traccar.xml`, aponte o encaminhamento de posições para o servidor:
+No `traccar.xml`, aponte o encaminhamento para o servidor e mande a chave do cliente no header:
 
 ```xml
 <entry key='forward.enable'>true</entry>
 <entry key='forward.json'>true</entry>
 <entry key='forward.url'>http://SEU_SERVIDOR:3000/api/ingest/traccar</entry>
+<entry key='forward.header'>x-api-key: SUA_CHAVE</entry>
 ```
 
-A categoria do dispositivo no Traccar (`truck`, `car`...) vira o `tipo`, e a velocidade em nós é convertida para km/h. O adaptador foi testado com um payload de exemplo; confirme o formato com a sua versão do Traccar.
-
-## Como a animação fica suave
-
-Os dados chegam a cada 2–30 s, mas a tela atualiza 60 vezes por segundo. Em `public/js/interp.js`, cada ativo desliza da posição exibida até a nova durante o intervalo típico entre atualizações; o rumo gira pelo caminho mais curto. Se a próxima posição atrasar, o ícone projeta o movimento por velocidade e rumo por até 3 s. Ativos parados aparecem como ponto (sem direção) e ativos sem sinal como contorno cinza.
+A categoria do dispositivo (`truck`, `car`...) vira o `tipo`, e a velocidade em nós é convertida para km/h. O adaptador foi testado só com um payload de exemplo, então confirme o formato com a sua versão do Traccar.
 
 ## Configuração (`.env`)
 
@@ -113,47 +153,54 @@ Copie `.env.example` para `.env`. Todas as variáveis são opcionais.
 | Variável | Padrão | Descrição |
 |---|---|---|
 | `PORT` | `3000` | Porta HTTP e WebSocket. |
-| `HOST` | `127.0.0.1` sem `API_KEY`; `0.0.0.0` com | Interface de rede. Sem chave, só esta máquina acessa; para receber de outra máquina (ex.: Traccar), defina `API_KEY`. |
-| `API_KEY` | vazio | Exige `x-api-key` nas rotas de escrita. |
+| `HOST` | automático | `127.0.0.1` no modo aberto e `0.0.0.0` quando há chave. |
+| `CLIENTES_FILE` | `data/clientes.json` | Clientes, chaves (hash) e CDs. |
+| `API_KEY` | vazio | Sem `clientes.json`, é a chave do cliente demo. Vazio = acesso aberto (só desenvolvimento). |
 | `SIMULATE` | `true` | Liga o simulador. Desligue ao usar dados reais. |
-| `SIM_SPEEDUP` | `5` | Aceleração do tempo nas rotas urbanas (1 = tempo real). |
+| `SIM_CLIENTE` | `demo` | Cliente que recebe os dados simulados. |
+| `SIM_SPEEDUP` | `5` | Aceleração do tempo nas rotas (1 = tempo real). |
 | `OSRM_URL` | servidor público | O público serve só para demonstração. |
 | `MAP_STYLE_URL` | vazio | `style.json` do MapLibre. Vazio usa o Positron do [OpenFreeMap](https://openfreemap.org). |
-| `MAP_LABEL_FONT` | `Noto Sans Bold` | Fonte dos rótulos; precisa existir no servidor de glyphs do estilo. |
-| `OFFLINE_AFTER_S` | `60` | Segundos sem sinal até virar "sem sinal". |
+| `MAP_LABEL_FONT` | `Noto Sans Bold` | Fonte dos rótulos. Precisa existir no servidor de fontes (glyphs) do estilo. |
+| `OFFLINE_AFTER_S` | `60` | Segundos sem posição até o ativo aparecer como "sem sinal". |
 | `TRAIL_MAX` | `300` | Pontos de rastro por ativo. |
 | `BATCH_MS` | `250` | Agrupamento das atualizações enviadas ao navegador. |
-| `MAX_ASSETS` | `10000` | Máximo de ativos distintos. Acima disso, IDs novos são recusados (protege a memória). |
+| `MAX_ASSETS` | `10000` | Máximo de ativos somando todos os clientes. Protege a memória do servidor. |
 
 ## Estrutura
 
 ```
 server/
-  index.js        inicialização (HTTP + WebSocket + simulador)
-  app.js          API REST e arquivos estáticos
-  hub.js          WebSocket: snapshot e lotes
-  normalize.js    validação do formato do ativo
+  index.js        inicialização (clientes, HTTP, WebSocket, simulador)
+  app.js          API REST por cliente e arquivos estáticos
+  hub.js          WebSocket: autenticação, snapshot e lotes por cliente
+  tenants.js      clientes e chaves de acesso
+  centros.js      CDs, cerca virtual e planta
+  viagens.js      viagens (dados do transporte)
+  eventos.js      entradas e saídas de CD
+  normalize.js    validação das posições
   store.js        última posição, rastro e status (troque por Redis/PostGIS)
   ingest.js       único caminho de entrada de dados
-  spaces.js       plantas dos ambientes internos
+  demo.js         rede de exemplo da Grande Florianópolis
   adapters/       conversores de fontes externas (Traccar)
-  sim/            simulador (rotas, OSRM, agentes)
+  sim/            simulador (rotas, OSRM, veículos e viagens)
 public/
   index.html, css/style.css
-  js/main.js      orquestra dados, animação e interface
-  js/interp.js    interpolação (código puro, testado)
-  js/geoView.js   mapa (MapLibre)    js/indoorView.js  planta (canvas)
-test/             39 testes (node --test)
-scripts/          fake-device.js
+  js/main.js        orquestra acesso, dados, animação e interface
+  js/logistica.js   resumo de CD, busca e formatação (código puro, testado)
+  js/interp.js      interpolação do movimento (código puro, testado)
+  js/geoView.js     mapa (MapLibre)    js/indoorView.js  planta do CD (canvas)
+test/             62 testes (node --test)
+scripts/          novo-cliente.js, fake-device.js
 ```
 
 ## Antes de ir para produção
 
+- **Persistência:** tudo fica em memória. Reiniciar o servidor apaga posições, viagens e eventos.
+- **Acesso:** hoje cada empresa tem uma única chave, sem usuários individuais. Use HTTPS (proxy reverso com TLS) para a chave não trafegar em texto puro. Revogue a chave de quem sair com `npm run cliente -- <id> --nova-chave`.
 - **LGPD:** a posição de um veículo revela a rotina do motorista e é dado pessoal. Defina base legal, retenção, controle de acesso e registro de consultas.
-- **Provedor de mapa:** o OpenFreeMap e o servidor OSRM públicos servem para desenvolvimento. Em produção, hospede os seus ou contrate um provedor (MapTiler, Stadia, Mapbox...) e revise os termos de uso. (Os tiles públicos da CARTO, usados até a v0.1, passaram a exigir chave.)
-- **Autenticação:** hoje só a escrita é protegida por chave; a leitura (API e WebSocket) é aberta para quem alcança o servidor. Não exponha à internet sem um proxy com autenticação.
-- **HTTPS e limite de requisições:** o servidor fala HTTP puro e não limita requisições por cliente. Em produção, ponha-o atrás de um proxy reverso (nginx, Caddy) com TLS e rate limiting.
-- **Fontes externas:** o navegador busca o Google Fonts e os tiles do mapa direto nos provedores, que recebem o IP de quem usa o painel. Para LGPD estrita, hospede ambos.
-- **Persistência:** o armazenamento é em memória; reiniciar o servidor apaga posições e rastros.
+- **Limite de requisições:** o servidor não limita requisições por cliente. Configure isso no proxy reverso (nginx, Caddy).
+- **Provedor de mapa:** o OpenFreeMap e o OSRM públicos servem para desenvolvimento. Em produção, hospede os seus ou contrate um provedor (MapTiler, Stadia, Mapbox...) e revise os termos de uso.
+- **Fontes externas:** o navegador busca o Google Fonts e os tiles direto nos provedores, que recebem o IP de quem usa o painel.
 
-O roadmap detalhado, com critérios de aceite, está no `CLAUDE.md`.
+O roadmap, com as prioridades, está no `CLAUDE.md`.

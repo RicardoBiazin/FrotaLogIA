@@ -10,6 +10,19 @@ const MIN_FRAME_MS = 33; // ~30 fps é suficiente para o GeoJSON; o ícone conti
 const DEFAULT_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
 // Fonte dos rótulos: precisa existir no servidor de glyphs do estilo em uso.
 const DEFAULT_LABEL_FONT = 'Noto Sans Bold';
+const CD_COLOR = '#18282c';
+
+/** Polígono aproximando o círculo de `raioM` metros em volta do ponto (para a cerca do CD). */
+function circle(lon, lat, raioM, steps = 48) {
+  const coords = [];
+  const dLat = raioM / 111_320;
+  const dLon = raioM / (111_320 * Math.cos((lat * Math.PI) / 180));
+  for (let i = 0; i <= steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    coords.push([lon + Math.sin(a) * dLon, lat + Math.cos(a) * dLat]);
+  }
+  return coords;
+}
 
 export class GeoView {
   constructor(container, config, handlers) {
@@ -18,6 +31,9 @@ export class GeoView {
     this.handlers = handlers;
     this.lastDraw = 0;
     this.ready = false;
+    this.centros = [];
+    this.cdLabels = new Map(); // id → texto do resumo
+    this.cdSelected = null;
   }
 
   async init() {
@@ -47,6 +63,40 @@ export class GeoView {
 
     map.addSource('trail', { type: 'geojson', data: EMPTY });
     map.addSource('assets', { type: 'geojson', data: EMPTY });
+    map.addSource('centros-area', { type: 'geojson', data: EMPTY });
+    map.addSource('centros', { type: 'geojson', data: EMPTY });
+
+    // CDs: cerca (área), marcador e rótulo com o resumo. Abaixo dos veículos.
+    map.addLayer({
+      id: 'centros-fill',
+      type: 'fill',
+      source: 'centros-area',
+      minzoom: 11,
+      paint: { 'fill-color': CD_COLOR, 'fill-opacity': ['case', ['get', 'selected'], 0.12, 0.06] },
+    });
+    map.addLayer({
+      id: 'centros-line',
+      type: 'line',
+      source: 'centros-area',
+      minzoom: 11,
+      paint: {
+        'line-color': CD_COLOR,
+        'line-width': ['case', ['get', 'selected'], 2.5, 1.2],
+        'line-dasharray': [2, 1.5],
+        'line-opacity': 0.6,
+      },
+    });
+    map.addLayer({
+      id: 'centros-ponto',
+      type: 'circle',
+      source: 'centros',
+      paint: {
+        'circle-radius': ['case', ['get', 'selected'], 11, 8],
+        'circle-color': CD_COLOR,
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': 2.5,
+      },
+    });
 
     map.addLayer({
       id: 'trail-line',
@@ -82,7 +132,21 @@ export class GeoView {
       },
     });
     try {
-      // Camada separada: se as fontes (glyphs) falharem, os ícones continuam funcionando.
+      // Camadas separadas: se as fontes (glyphs) falharem, os ícones continuam funcionando.
+      map.addLayer({
+        id: 'centros-rotulo',
+        type: 'symbol',
+        source: 'centros',
+        layout: {
+          'text-field': ['format', ['get', 'nome'], {}, '\n', {}, ['get', 'resumo'], { 'font-scale': 0.85 }],
+          'text-font': [this.config.mapLabelFont || DEFAULT_LABEL_FONT],
+          'text-size': 12.5,
+          'text-offset': [0, 1.1],
+          'text-anchor': 'top',
+          'text-optional': true,
+        },
+        paint: { 'text-color': CD_COLOR, 'text-halo-color': '#ffffff', 'text-halo-width': 1.8 },
+      });
       map.addLayer({
         id: 'assets-label',
         type: 'symbol',
@@ -102,15 +166,60 @@ export class GeoView {
       console.warn('Rótulos do mapa desativados (estilo sem glyphs):', err.message);
     }
 
-    map.on('mouseenter', 'assets-icon', () => (map.getCanvas().style.cursor = 'pointer'));
-    map.on('mouseleave', 'assets-icon', () => (map.getCanvas().style.cursor = ''));
+    for (const layer of ['assets-icon', 'centros-ponto', 'centros-fill']) {
+      map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'));
+      map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''));
+    }
     map.on('click', (e) => {
-      const hit = map.queryRenderedFeatures(e.point, { layers: ['assets-icon'] })[0];
-      this.handlers.onSelect(hit ? hit.properties.id : null);
+      // Veículo tem prioridade sobre o CD (ele costuma estar dentro da cerca).
+      const asset = map.queryRenderedFeatures(e.point, { layers: ['assets-icon'] })[0];
+      if (asset) return this.handlers.onSelect(asset.properties.id);
+      const cd = map.queryRenderedFeatures(e.point, { layers: ['centros-ponto', 'centros-fill'] })[0];
+      if (cd) return this.handlers.onSelectCd(cd.properties.id);
+      this.handlers.onSelect(null);
     });
     map.on('dragstart', () => this.handlers.onUserPan());
 
     this.ready = true;
+    this.#drawCentros();
+  }
+
+  /** centros: [{ id, nome, lat, lon, raioM }] */
+  setCentros(centros) {
+    this.centros = centros;
+    this.#drawCentros();
+  }
+
+  /** labels: Map<id, string> com o resumo de cada CD. Só redesenha se mudou. */
+  setCentroLabels(labels) {
+    let changed = labels.size !== this.cdLabels.size;
+    for (const [id, text] of labels) if (this.cdLabels.get(id) !== text) changed = true;
+    if (!changed) return;
+    this.cdLabels = new Map(labels);
+    this.#drawCentros();
+  }
+
+  setSelectedCd(id) {
+    if (this.cdSelected === id) return;
+    this.cdSelected = id;
+    this.#drawCentros();
+  }
+
+  #drawCentros() {
+    if (!this.ready) return;
+    const props = (c) => ({ id: c.id, nome: c.nome, resumo: this.cdLabels.get(c.id) ?? '', selected: c.id === this.cdSelected });
+    this.map.getSource('centros').setData({
+      type: 'FeatureCollection',
+      features: this.centros.map((c) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [c.lon, c.lat] }, properties: props(c) })),
+    });
+    this.map.getSource('centros-area').setData({
+      type: 'FeatureCollection',
+      features: this.centros.map((c) => ({
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [circle(c.lon, c.lat, c.raioM)] },
+        properties: props(c),
+      })),
+    });
   }
 
   /** items: [{ id, nome, tipo, status, x (lon), y (lat), rumo }]. Retorna true se desenhou o quadro. */

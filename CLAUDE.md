@@ -11,14 +11,16 @@ Usuário final: operadores de logística/frota.
 **Visão do produto (definida pelo dono em 06/10/2026):** painel de **logística de transporte como um todo**, com todos os veículos da frota na estrada e nos **centros de distribuição (CDs)** em tempo real.
 - Ao clicar num veículo, o card mostra **os dados do transporte**: origem e destino, o que leva (carga), peso, volume, remetente e destinatário, além da telemetria.
 - No mapa dá para ver a frota inteira ou **dar zoom em cada CD** e ver o que acontece lá dentro: docas, pátio, empilhadeiras e veículos carregando/descarregando.
-- Hoje o código cobre a telemetria (posição, status, rastro) e uma planta de galpão fixa. Os dados de transporte e os CDs georreferenciados ainda não existem; ver o Roadmap. Idioma da interface e dos comentários: **português do Brasil**.
+- **Cada cliente (empresa) tem a própria rede** em tempo real e só enxerga a dela. O cliente `demo` traz uma rede de exemplo na Grande Florianópolis (`server/demo.js`).
+- Desde a v0.3.0 existem: clientes com chave, viagens (dados do transporte), CDs no mapa com cerca e planta, eventos de entrada/saída e o painel do CD. Idioma da interface e dos comentários: **português do Brasil**.
 
 ## Comandos
 
 ```bash
 npm install
 npm run dev     # node --watch server/index.js  → http://localhost:3000
-npm test        # node --test (39 testes; devem passar sempre)
+npm test        # node --test (62 testes; devem passar sempre)
+npm run cliente -- <id> "<nome>" [--demo]   # cria cliente em data/clientes.json e mostra a chave uma vez
 npm run device  # simula um dispositivo externo enviando posições por HTTP
 ```
 
@@ -27,16 +29,21 @@ Node >= 20.12. **Não adicione dependências nativas** (precisam compilar no Win
 ## Arquitetura (fluxo de dados)
 
 ```
+chave (x-api-key / auth no WS) → tenants.js → cliente
 fonte (HTTP / adaptador / simulador)
-  → ingest.js → normalize.js → store.js (estado + rastro + status)
-  → evento 'update' → hub.js (agrupa em lotes de BATCH_MS) → WebSocket
-  → public/js/ws.js → main.js → AnimatedAsset (interp.js) → geoView.js | indoorView.js
+  → ingest.position(cliente, …) → normalize.js → cerca dos CDs (centros.js) → store.js
+  → ingest.trip(cliente, …)     → viagens.js (ViagemStore)
+  → entrada/saída de CD          → eventos.js (EventLog)
+  → hub.js (por cliente, lotes de BATCH_MS) → WebSocket
+  → public/js/ws.js → main.js → interp.js + logistica.js → geoView.js | indoorView.js
 ```
 
-- **Todo dado entra por `createIngest`** (`server/ingest.js`). Adaptadores e o simulador também. Não grave direto no store a partir de rotas ou adaptadores.
-- `store.js` é o ponto de troca para persistência (mesma interface: `upsert/get/list/trail/remove/sweep` + eventos `update`/`remove`).
-- O simulador (`server/sim/`) usa o mesmo caminho dos dados reais; desligue com `SIMULATE=false`.
-- Mensagens WS (servidor → cliente): `snapshot`, `batch`, `remove`. Ver `server/hub.js`.
+- **Multi-cliente é a base, não um filtro.** Store, viagens, eventos e o hub são separados por `cliente`; toda rota de dados passa por `requireTenant` (`server/app.js`) e todo WS começa com `{ type: 'auth', chave }`. Nunca leia ou grave sem o cliente; teste o isolamento (`test/api.test.js`) ao mexer em rota ou mensagem.
+- Clientes vêm de `data/clientes.json` (ignorado no git; só o **hash** SHA-256 da chave). Sem o arquivo existe só o `demo`: com `API_KEY` a chave dele é essa; sem, o acesso é aberto e o servidor escuta só em 127.0.0.1.
+- **Todo dado entra por `createIngest`** (`server/ingest.js`): `position` e `trip`. Adaptadores e o simulador também. Não grave direto nos stores a partir de rotas ou adaptadores.
+- `store.js` e `viagens.js` são os pontos de troca para persistência (mesma interface + eventos `update`/`remove`).
+- O simulador (`server/sim/`) gera posições **e viagens** (cada ida/volta da rota é uma viagem) para `SIM_CLIENTE`; desligue com `SIMULATE=false`.
+- Mensagens WS (servidor → navegador): `snapshot` (com `cliente`, `assets`, `viagens` ativas e `eventos`), `batch` (`assets` + `viagens`), `remove`, `evento`. Chave recusada fecha com 4401. Ver `server/hub.js`.
 
 ## Contrato de dados (invariantes)
 
@@ -47,12 +54,15 @@ fonte (HTTP / adaptador / simulador)
 - `receivedAt` (relógio do servidor) vai para o cliente e é a base do "atualizado há". Mensagem só de status (mesmo `ts`) não pode reiniciar esse relógio.
 - Ao trocar entre mapa e planta (`espaco` muda), o rastro recomeça no servidor e no cliente: as coordenadas não se misturam.
 - Busca em tabela de sinônimos vinda de entrada externa usa `Object.hasOwn` ("constructor" e "__proto__" já corromperam o `tipo`).
+- **CD** (`server/centros.js`): ponto + `raioM` (cerca) + `planta` opcional. Veículo de rua dentro do raio recebe `cd`; ele só sai depois de `raio + max(150 m, 50%)` (histerese: a estrada perto da borda fazia o GPS entrar e sair em sequência). Ativo de planta usa `espaco` = id do CD.
+- **Viagem** (`server/viagens.js`): `status` em `planejada | carregando | em_transito | descarregando | entregue | cancelada`; peso em kg, volume em m³, valor em R$. O navegador guarda só as ativas, indexadas por veículo (`applyViagem` em `logistica.js`).
 - Nomes de campos de domínio são em português (`tipo`, `rumo`, `velocidade`, `espaco`, `atributos`); nomes de infraestrutura em inglês.
 - Tipos válidos estão em `server/normalize.js` (`TIPOS`) e `public/js/icons.js`. Ao criar um tipo novo, atualize os dois, o desenho em `icons.js` e os testes.
 
 ## Frontend
 
-- `public/js/interp.js` é **código puro** (sem DOM) e tem testes em `test/interp.test.js`. Mantenha assim; a lógica de animação deve continuar testável.
+- `public/js/interp.js` e `public/js/logistica.js` são **código puro** (sem DOM), testados em `test/interp.test.js` e `test/logistica.test.js`. Regra nova de tela (resumo de CD, busca, formatação) vai para `logistica.js`, com teste.
+- Na planta, os veículos de rua no pátio do CD aparecem encostados nas docas (`portas`, na ordem do id); os que sobram viram uma linha "Aguardando doca".
 - Animação: cada `AnimatedAsset` desliza da pose exibida até a nova durante o intervalo típico entre atualizações (calculado pela diferença de `ts`), e projeta por velocidade/rumo por até 3 s se a atualização atrasar. Lacuna > 60 s salta direto.
 - O mapa **carrega em paralelo** ao WebSocket: lista, contadores e planta não podem depender do evento `load` do MapLibre (tiles lentos já travaram o app uma vez).
 - `geoView.js` atualiza uma fonte GeoJSON a ~30 fps (`setData`). Funciona bem para centenas de ativos; acima de ~2000, migre para deck.gl (`IconLayer`) ou desenhe só os ativos da área visível.
@@ -81,14 +91,17 @@ fonte (HTTP / adaptador / simulador)
 
 ## Roadmap (em ordem de prioridade)
 
-1. **Cercas virtuais (geofences).** Polígonos/círculos em `data/geofences.json`. Avaliar na ingestão (entrada/saída por ativo), emitir mensagem WS `{ type: 'event', ... }`, mostrar no mapa e em um painel de alertas. *Aceite:* testes de entrada/saída, histórico dos últimos eventos em `GET /api/events`.
-2. **Histórico e replay.** Interface `HistoryStore` (append de posições, consulta por ativo e período) com implementação PostGIS ou TimescaleDB. `GET /api/assets/:id/history?from=&to=` e controle de linha do tempo na UI.
-3. **Última posição em Redis + pub/sub**, para rodar mais de uma instância do servidor.
-4. **Autenticação e multi-cliente.** Proteger também a leitura (API e WS), com filtros por frota/cliente.
-5. **Escala.** Filtro por área visível no WS (`{ type: 'viewport', bbox }`) e deck.gl para milhares de ativos; virtualizar a lista lateral.
-6. **Mais fontes.** Ingestão MQTT e adaptadores em `server/adapters/` (Sascar, Omnilink, Samsara, Geotab, FMS de fábrica). Cada adaptador só converte para o formato do ativo e chama `ingest`.
-7. **Planta real.** Carregar plantas de GeoJSON/CAD, vários espaços com seletor, integração com RTLS (UWB/BLE) e calibração.
-8. **Alertas operacionais.** Sem sinal por mais de N minutos, parado além do esperado, excesso de velocidade; relatórios por período.
-9. **LGPD.** Retenção configurável, anonimização de rastros antigos, registro de quem consultou o quê.
+Feito na v0.3.0: cerca circular dos CDs com eventos (`GET /api/eventos`, WS `evento`) e autenticação por cliente na leitura e na escrita.
 
-Antes de grandes mudanças (itens 2 a 5), proponha um plano curto e confirme com o usuário.
+1. **Persistência e cadastro.** Banco (PostgreSQL/PostGIS) para clientes, CDs, viagens e eventos; tela de cadastro de CDs e de clientes no lugar do `data/clientes.json`. Hoje reiniciar apaga tudo.
+2. **Usuários por cliente.** Hoje é uma chave por empresa; o próximo passo é usuário/senha (ou SSO) com papéis (operador, gestor) e registro de quem consultou o quê (LGPD).
+3. **Integração com TMS/ERP e CT-e.** Receber viagens do sistema do cliente (webhook, importação de XML do CT-e/MDF-e) em vez de só `POST /api/viagens`.
+4. **Histórico e replay.** Interface `HistoryStore` (append de posições, consulta por ativo e período) com implementação PostGIS ou TimescaleDB. `GET /api/assets/:id/history?from=&to=` e controle de linha do tempo na UI.
+5. **Última posição em Redis + pub/sub**, para rodar mais de uma instância do servidor.
+6. **Escala.** Filtro por área visível no WS (`{ type: 'viewport', bbox }`) e deck.gl para milhares de ativos; virtualizar a lista lateral.
+7. **Mais fontes.** Ingestão MQTT e adaptadores em `server/adapters/` (Sascar, Omnilink, Samsara, Geotab, FMS de fábrica). Cada adaptador só converte para o formato do ativo e chama `ingest`.
+8. **Planta real e docas.** Plantas de GeoJSON/CAD, cercas em polígono, doca atribuída pelo WMS/RTLS (hoje é pela ordem do id) e integração com RTLS (UWB/BLE).
+9. **Alertas operacionais.** Atraso na previsão, sem sinal por mais de N minutos, parado além do esperado, tempo de pátio, excesso de velocidade; relatórios por período.
+10. **LGPD.** Retenção configurável, anonimização de rastros antigos, registro de quem consultou o quê.
+
+Antes de grandes mudanças (itens 1 a 6), proponha um plano curto e confirme com o usuário.

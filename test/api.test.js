@@ -1,25 +1,46 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import WebSocket from 'ws';
 import { AssetStore } from '../server/store.js';
+import { ViagemStore } from '../server/viagens.js';
+import { EventLog } from '../server/eventos.js';
+import { parseTenants, sha256 } from '../server/tenants.js';
 import { createIngest } from '../server/ingest.js';
 import { createApp } from '../server/app.js';
-import { SPACES } from '../server/spaces.js';
+import { createHub } from '../server/hub.js';
 
 let server;
+let hub;
 let base;
 let store;
-const config = { apiKey: 'segredo', mapStyleUrl: '', mapCenter: [0, 0], mapZoom: 5, offlineAfterMs: 60_000 };
+const config = { mapStyleUrl: '', mapCenter: [0, 0], mapZoom: 5, offlineAfterMs: 60_000 };
+const hex = (k) => sha256(k).toString('hex');
+const CD = { id: 'cd-1', nome: 'CD Teste', lat: -27.6, lon: -48.6, raioM: 300, planta: { largura: 20, altura: 10 } };
 
 before(async () => {
+  const tenants = parseTenants([
+    { id: 'alfa', nome: 'Alfa Transportes', chaveSha256: hex('chave-alfa'), centros: [CD] },
+    { id: 'beta', nome: 'Beta Logística', chaveSha256: hex('chave-beta') },
+  ]);
   store = new AssetStore();
-  const app = createApp({ config, store, ingest: createIngest(store), spaces: SPACES, version: '9.9.9' });
+  const viagens = new ViagemStore();
+  const eventos = new EventLog();
+  const ingest = createIngest({ store, viagens, eventos, tenants });
+  const app = createApp({ config, store, viagens, eventos, ingest, tenants, version: '9.9.9' });
   server = http.createServer(app);
-  await new Promise((resolve) => server.listen(0, resolve));
+  hub = createHub({ server, store, viagens, eventos, tenants, batchMs: 50 });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   base = `http://127.0.0.1:${server.address().port}`;
 });
-after(() => new Promise((resolve) => server.close(resolve)));
+after(() => {
+  hub.close();
+  return new Promise((resolve) => server.close(resolve));
+});
 
+const A = { 'x-api-key': 'chave-alfa' };
+const B = { 'x-api-key': 'chave-beta' };
+const get = (path, headers = {}) => fetch(base + path, { headers });
 const post = (path, body, headers = {}) =>
   fetch(base + path, {
     method: 'POST',
@@ -27,16 +48,42 @@ const post = (path, body, headers = {}) =>
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 
-test('exige x-api-key para gravar', async () => {
-  const res = await post('/api/positions', { id: 'A', lat: 1, lon: 1 });
-  assert.equal(res.status, 401);
+const viagem = (over = {}) => ({
+  id: 'VG-1', veiculo: 'T1', status: 'em_transito',
+  origem: { nome: 'CD Teste', cd: 'cd-1' }, destino: { nome: 'Cliente X' },
+  remetente: { nome: 'Indústria A' }, destinatario: { nome: 'Loja B' },
+  carga: { descricao: 'Bebidas', pesoKg: 12_000, volumeM3: 40 },
+  ...over,
+});
+
+test('leitura e escrita exigem chave; chave errada é recusada', async () => {
+  assert.equal((await post('/api/positions', { id: 'A', lat: 1, lon: 1 })).status, 401);
+  assert.equal((await get('/api/assets')).status, 401);
+  assert.equal((await get('/api/assets', { 'x-api-key': 'errada' })).status, 401);
+  assert.equal((await get('/api/viagens')).status, 401);
+  assert.equal((await get('/api/centros')).status, 401);
+});
+
+test('config e health são públicos e não expõem dados de clientes', async () => {
+  const cfg = await (await get('/api/config')).json();
+  assert.equal(cfg.auth, true);
+  assert.equal(cfg.versao, '9.9.9');
+  assert.deepEqual(cfg.tipos, ['caminhao', 'carro', 'empilhadeira', 'outro']);
+  const health = await (await get('/api/health')).json();
+  assert.equal(health.versao, '9.9.9');
+  assert.equal(health.ativos, undefined);
+});
+
+test('sessão identifica o cliente pela chave', async () => {
+  assert.deepEqual(await (await get('/api/sessao', A)).json(), { cliente: { id: 'alfa', nome: 'Alfa Transportes' } });
+  assert.equal((await (await get('/api/sessao', B)).json()).cliente.id, 'beta');
 });
 
 test('aceita lote com rejeições parciais e detalha os erros', async () => {
   const res = await post(
     '/api/positions',
-    [{ id: 'T1', tipo: 'truck', lat: -27.6, lon: -48.5, velocidade: 50 }, { id: '', lat: 1, lon: 1 }],
-    { 'x-api-key': 'segredo' },
+    [{ id: 'T1', tipo: 'truck', lat: -27.7, lon: -48.5, velocidade: 50 }, { id: '', lat: 1, lon: 1 }],
+    A,
   );
   assert.equal(res.status, 202);
   const body = await res.json();
@@ -44,18 +91,53 @@ test('aceita lote com rejeições parciais e detalha os erros', async () => {
   assert.equal(body.rejected[0].index, 1);
 });
 
-test('lê ativos, rastro e 404', async () => {
-  const list = await (await fetch(`${base}/api/assets?tipo=caminhao`)).json();
-  assert.equal(list.length, 1);
-  assert.equal(list[0].id, 'T1');
-  assert.equal(list[0].status, 'movimento');
-  const trail = await (await fetch(`${base}/api/assets/T1/trail`)).json();
-  assert.equal(trail.points.length, 1);
-  assert.equal((await fetch(`${base}/api/assets/nao-existe`)).status, 404);
+test('cada cliente só enxerga a própria frota', async () => {
+  const alfa = await (await get('/api/assets', A)).json();
+  assert.deepEqual(alfa.map((a) => a.id), ['T1']);
+  assert.deepEqual(await (await get('/api/assets', B)).json(), []);
+  assert.equal((await get('/api/assets/T1', B)).status, 404);
+  assert.equal((await get('/api/assets/T1/trail', B)).status, 404);
+  assert.equal((await fetch(`${base}/api/assets/T1`, { method: 'DELETE', headers: B })).status, 404);
+  assert.equal((await get('/api/assets/T1', A)).status, 200);
+});
+
+test('viagem: grava, devolve no ativo e fica isolada por cliente', async () => {
+  const res = await post('/api/viagens', viagem(), A);
+  assert.equal(res.status, 202);
+  const a = await (await get('/api/assets/T1', A)).json();
+  assert.equal(a.viagem.id, 'VG-1');
+  assert.equal(a.viagem.carga.pesoKg, 12_000);
+  assert.equal((await get('/api/viagens/VG-1', B)).status, 404);
+  assert.equal((await (await get('/api/viagens?ativas=true', A)).json()).length, 1);
+
+  const bad = await post('/api/viagens', viagem({ id: 'VG-2', status: 'voando' }), A);
+  assert.equal(bad.status, 400);
+  assert.match((await bad.json()).rejected[0].erro, /status inválido/);
+});
+
+test('entrada e saída do CD viram eventos do cliente', async () => {
+  await post('/api/positions', { id: 'T1', lat: -27.6, lon: -48.6, ts: Date.now() }, A); // dentro do raio
+  let a = await (await get('/api/assets/T1', A)).json();
+  assert.equal(a.cd, 'cd-1');
+  await post('/api/positions', { id: 'T1', lat: -27.7, lon: -48.6, ts: Date.now() + 1 }, A); // ~11 km
+  a = await (await get('/api/assets/T1', A)).json();
+  assert.equal(a.cd, null);
+  const eventos = await (await get('/api/eventos', A)).json();
+  assert.deepEqual(eventos.slice(0, 2).map((e) => e.tipo), ['saida', 'entrada']);
+  assert.equal(eventos[0].cdNome, 'CD Teste');
+  assert.deepEqual(await (await get('/api/eventos', B)).json(), []);
+});
+
+test('centros trazem a planta no formato da tela', async () => {
+  const [cd] = await (await get('/api/centros', A)).json();
+  assert.equal(cd.id, 'cd-1');
+  assert.equal(cd.planta.id, 'cd-1');
+  assert.equal(cd.planta.largura, 20);
+  assert.deepEqual(await (await get('/api/centros', B)).json(), []);
 });
 
 test('JSON inválido responde 400', async () => {
-  const res = await post('/api/positions', '{quebrado', { 'x-api-key': 'segredo' });
+  const res = await post('/api/positions', '{quebrado', A);
   assert.equal(res.status, 400);
 });
 
@@ -66,20 +148,13 @@ test('adaptador Traccar converte nós em km/h e categoria em tipo', async () => 
       device: { id: 7, uniqueId: 'IMEI123', name: 'Volvo FH', category: 'truck' },
       position: { latitude: -27.5, longitude: -48.6, speed: 10, course: 45, fixTime: new Date().toISOString() },
     },
-    { 'x-api-key': 'segredo' },
+    A,
   );
   assert.equal(res.status, 202);
-  const a = await (await fetch(`${base}/api/assets/IMEI123`)).json();
+  const a = await (await get('/api/assets/IMEI123', A)).json();
   assert.equal(a.tipo, 'caminhao');
   assert.equal(a.nome, 'Volvo FH');
   assert.ok(Math.abs(a.velocidade - 18.52) < 0.01);
-});
-
-test('serve a planta e a configuração', async () => {
-  const spaces = await (await fetch(`${base}/api/spaces`)).json();
-  assert.equal(spaces[0].id, 'galpao-1');
-  const cfg = await (await fetch(`${base}/api/config`)).json();
-  assert.deepEqual(cfg.tipos, ['caminhao', 'carro', 'empilhadeira', 'outro']);
 });
 
 test('envia cabeçalhos de segurança (CSP só com scripts da origem)', async () => {
@@ -91,16 +166,68 @@ test('envia cabeçalhos de segurança (CSP só com scripts da origem)', async ()
     assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
     assert.equal(res.headers.get('x-powered-by'), null);
   }
+  assert.equal((await get('/api/assets', A)).headers.get('cache-control'), 'no-store');
 });
 
-test('health e config informam a versão', async () => {
-  assert.equal((await (await fetch(`${base}/api/health`)).json()).versao, '9.9.9');
-  assert.equal((await (await fetch(`${base}/api/config`)).json()).versao, '9.9.9');
-});
-
-test('DELETE exige chave e remove o ativo', async () => {
-  assert.equal((await fetch(`${base}/api/assets/T1`, { method: 'DELETE' })).status, 401);
-  const res = await fetch(`${base}/api/assets/T1`, { method: 'DELETE', headers: { 'x-api-key': 'segredo' } });
+test('DELETE remove o ativo do próprio cliente', async () => {
+  const res = await fetch(`${base}/api/assets/IMEI123`, { method: 'DELETE', headers: A });
   assert.equal(res.status, 204);
-  assert.equal((await fetch(`${base}/api/assets/T1`)).status, 404);
+  assert.equal((await get('/api/assets/IMEI123', A)).status, 404);
+});
+
+// ---------- WebSocket ----------
+
+function openWs() {
+  const ws = new WebSocket(`${base.replace('http', 'ws')}/ws`);
+  const messages = [];
+  const waiters = [];
+  ws.on('message', (raw) => {
+    const msg = JSON.parse(raw);
+    messages.push(msg);
+    for (const w of [...waiters]) if (w.pred(msg)) {
+      waiters.splice(waiters.indexOf(w), 1);
+      w.resolve(msg);
+    }
+  });
+  const next = (pred) =>
+    new Promise((resolve, reject) => {
+      const found = messages.find(pred);
+      if (found) return resolve(found);
+      waiters.push({ pred, resolve });
+      setTimeout(() => reject(new Error('mensagem não chegou')), 2000);
+    });
+  const closed = new Promise((resolve) => ws.on('close', (code) => resolve(code)));
+  const opened = new Promise((resolve) => ws.on('open', resolve));
+  return { ws, next, closed, opened };
+}
+
+test('WebSocket: chave inválida fecha com 4401 e não recebe dados', async () => {
+  const c = openWs();
+  await c.opened;
+  c.ws.send(JSON.stringify({ type: 'auth', chave: 'errada' }));
+  assert.equal(await c.closed, 4401);
+});
+
+test('WebSocket: snapshot e lotes só do próprio cliente', async () => {
+  const alfa = openWs();
+  const beta = openWs();
+  await Promise.all([alfa.opened, beta.opened]);
+  alfa.ws.send(JSON.stringify({ type: 'auth', chave: 'chave-alfa' }));
+  beta.ws.send(JSON.stringify({ type: 'auth', chave: 'chave-beta' }));
+
+  const snapA = await alfa.next((m) => m.type === 'snapshot');
+  assert.equal(snapA.cliente.id, 'alfa');
+  assert.ok(snapA.assets.some((a) => a.id === 'T1'));
+  assert.ok(snapA.viagens.some((v) => v.id === 'VG-1'));
+  const snapB = await beta.next((m) => m.type === 'snapshot');
+  assert.deepEqual(snapB.assets, []);
+
+  await post('/api/positions', { id: 'SO-ALFA', lat: -27, lon: -48 }, A);
+  const batch = await alfa.next((m) => m.type === 'batch' && m.assets.some((a) => a.id === 'SO-ALFA'));
+  assert.ok(batch);
+  // beta não pode receber lote nenhum (espera o timeout de 2 s do next)
+  const vazou = await beta.next((m) => m.type === 'batch').then(() => true, () => false);
+  assert.equal(vazou, false);
+  alfa.ws.close();
+  beta.ws.close();
 });

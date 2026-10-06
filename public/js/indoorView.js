@@ -1,4 +1,6 @@
-// Visualização de planta interna em <canvas>. Coordenadas em metros; y cresce para cima.
+// Visualização da planta de um CD em <canvas>. Coordenadas em metros; y cresce para cima.
+// Veículos no pátio do CD aparecem encostados nas docas (lado sul, y < 0), na ordem do id;
+// os que não cabem nas docas aparecem como "aguardando doca" numa linha de texto.
 import { drawGlyph } from './icons.js';
 
 const ZONE_FILL = {
@@ -8,7 +10,9 @@ const ZONE_FILL = {
   picking: '#e4edf6',
 };
 const PAD = 28;
-
+const PAD_BOTTOM = 112; // espaço do pátio, abaixo das docas
+const DOCK_Y = -4; // metros: logo fora da parede, em frente à porta
+const VIAGEM_CURTA = { carregando: 'carregando', descarregando: 'descarregando', em_transito: 'saindo', planejada: 'aguardando' };
 export class IndoorView {
   constructor(wrap, canvas, handlers) {
     this.wrap = wrap;
@@ -20,7 +24,7 @@ export class IndoorView {
     this.selectedId = null;
     this.lastItems = [];
     this.layout = { scale: 1, ox: 0, oy: 0 };
-    this.insets = { top: 0, bottom: 0 }; // áreas cobertas por painéis flutuantes
+    this.insets = { top: 0, bottom: 0, right: 0 }; // áreas cobertas por painéis flutuantes
 
     new ResizeObserver(() => this.resize()).observe(wrap);
     canvas.addEventListener('click', (e) => this.#onClick(e));
@@ -54,10 +58,10 @@ export class IndoorView {
     this.#computeLayout();
   }
 
-  /** Reserva faixas (px) no topo/rodapé para que painéis flutuantes não cubram a planta. */
-  setInsets(top, bottom) {
-    const next = { top: Math.round(top), bottom: Math.round(bottom) };
-    if (next.top === this.insets.top && next.bottom === this.insets.bottom) return;
+  /** Reserva faixas (px) no topo, rodapé ou à direita para que painéis flutuantes não cubram a planta. */
+  setInsets(top, bottom, right = 0) {
+    const next = { top: Math.round(top), bottom: Math.round(bottom), right: Math.round(right) };
+    if (next.top === this.insets.top && next.bottom === this.insets.bottom && next.right === this.insets.right) return;
     this.insets = next;
     this.#computeLayout();
   }
@@ -65,7 +69,8 @@ export class IndoorView {
   #computeLayout() {
     if (!this.space || !this.cssW) return;
     const { largura, altura } = this.space;
-    const fit = (availH) => Math.min((this.cssW - PAD * 2) / largura, (availH - PAD * 2) / altura);
+    const usableW = this.cssW - this.insets.right;
+    const fit = (availH) => Math.min((usableW - PAD * 2) / largura, (availH - PAD - PAD_BOTTOM) / altura);
 
     // Painéis flutuantes reduzem a área útil, mas a planta nunca encolhe abaixo de 60% do
     // tamanho original (em telas pequenas é melhor deixar o painel cobrir um canto).
@@ -74,10 +79,10 @@ export class IndoorView {
     const usableH = this.cssH - this.insets.top - this.insets.bottom;
     const usedH = altura * scale;
     const oy =
-      usedH + PAD * 2 <= usableH
-        ? this.insets.top + (usableH - usedH) / 2 // cabe na área livre: centraliza nela
-        : (this.cssH - usedH) / 2; // não cabe: centraliza no palco inteiro
-    this.layout = { scale, ox: (this.cssW - largura * scale) / 2, oy };
+      usedH + PAD + PAD_BOTTOM <= usableH
+        ? this.insets.top + (usableH - usedH - PAD_BOTTOM + PAD) / 2 // cabe na área livre: centraliza nela
+        : (this.cssH - usedH - PAD_BOTTOM + PAD) / 2; // não cabe: centraliza no palco inteiro
+    this.layout = { scale, ox: (usableW - largura * scale) / 2, oy };
   }
 
   #sx(x) {
@@ -88,11 +93,29 @@ export class IndoorView {
     return this.layout.oy + (this.space.altura - y) * this.layout.scale;
   }
 
-  /** items: [{ id, nome, tipo, status, x, y, rumo }] */
-  render(items) {
+  /** Veículos do pátio nas docas (na ordem do id) e os que sobram, aguardando doca. */
+  #dockSlots(docked) {
+    const portas = this.space.portas ?? [];
+    const sorted = [...docked].sort((a, b) => a.id.localeCompare(b.id));
+    const slots = sorted.slice(0, portas.length).map((a, i) => {
+      const p = portas[i];
+      return { ...a, px: this.#sx(p.x + p.w / 2), py: this.#sy(DOCK_Y), rumo: 180 };
+    });
+    return { slots, fila: sorted.slice(portas.length) };
+  }
+
+  /**
+   * items: [{ id, nome, tipo, status, x, y, rumo }] (dentro da planta)
+   * docked: [{ id, nome, tipo, status, viagemStatus }] (no pátio do CD)
+   */
+  render(items, docked = []) {
     const { ctx, space } = this;
     if (!space || !this.cssW) return;
-    this.lastItems = items;
+    const { slots, fila } = this.#dockSlots(docked);
+    this.lastItems = [
+      ...items.map((a) => ({ id: a.id, px: this.#sx(a.x), py: this.#sy(a.y) })),
+      ...slots.map((a) => ({ id: a.id, px: a.px, py: a.py })),
+    ];
     const { scale } = this.layout;
     ctx.clearRect(0, 0, this.cssW, this.cssH);
 
@@ -145,9 +168,9 @@ export class IndoorView {
       ctx.fillStyle = '#ffffff';
     }
 
-    // barra de escala (10 m)
+    // barra de escala (10 m), acima da planta
     const barX = this.#sx(0);
-    const barY = this.#sy(0) + 14;
+    const barY = this.#sy(space.altura) - 12;
     ctx.strokeStyle = '#18282c';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -208,6 +231,44 @@ export class IndoorView {
       ctx.fillText(a.nome, lx, py);
       ctx.textAlign = 'left';
     }
+
+    // pátio: veículos nas docas; os que sobram, numa linha de texto
+    if (fila.length > 0) {
+      ctx.font = '600 11.5px "Public Sans", system-ui, sans-serif';
+      ctx.fillStyle = '#51646a';
+      ctx.textBaseline = 'middle';
+      const texto = `Aguardando doca: ${fila.map((a) => a.nome).join(', ')}`;
+      ctx.fillText(texto, this.#sx(0), this.#sy(DOCK_Y) + 62, space.largura * scale);
+    }
+    ctx.textAlign = 'center';
+    for (const a of slots) {
+      if (a.id === this.selectedId) {
+        ctx.beginPath();
+        ctx.arc(a.px, a.py, 22, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(10, 107, 75, 0.16)';
+        ctx.fill();
+        ctx.strokeStyle = '#0a6b4b';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.save();
+      ctx.translate(a.px, a.py);
+      ctx.rotate((a.rumo * Math.PI) / 180);
+      drawGlyph(ctx, a.tipo, a.status === 'offline' ? 'offline' : 'movimento', 1.05);
+      ctx.restore();
+      const linhas = [a.nome, VIAGEM_CURTA[a.viagemStatus] ?? 'no pátio'];
+      ctx.font = '600 11px "Public Sans", system-ui, sans-serif';
+      linhas.forEach((t, i) => {
+        const ly = a.py + 26 + i * 13;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.strokeText(t, a.px, ly);
+        ctx.fillStyle = i === 0 ? '#18282c' : '#51646a';
+        ctx.fillText(t, a.px, ly);
+        ctx.font = '500 10.5px "Public Sans", system-ui, sans-serif';
+      });
+    }
+    ctx.textAlign = 'left';
   }
 
   #onClick(e) {
@@ -217,7 +278,7 @@ export class IndoorView {
     let best = null;
     let bestDist = 22;
     for (const a of this.lastItems) {
-      const d = Math.hypot(this.#sx(a.x) - mx, this.#sy(a.y) - my);
+      const d = Math.hypot(a.px - mx, a.py - my);
       if (d < bestDist) {
         best = a;
         bestDist = d;
