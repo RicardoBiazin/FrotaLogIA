@@ -19,12 +19,15 @@ Usuário final: operadores de logística/frota.
 ```bash
 npm install
 npm run dev     # node --watch server/index.js  → http://localhost:3000
-npm test        # node --test (62 testes; devem passar sempre)
+npm test        # node --test (65 testes; devem passar sempre)
+npm run licencas  # regenera THIRD_PARTY_NOTICES.md e barra licença copyleft
 npm run cliente -- <id> "<nome>" [--demo]   # cria cliente em data/clientes.json e mostra a chave uma vez
 npm run device  # simula um dispositivo externo enviando posições por HTTP
 ```
 
-Node >= 20.12. **Não adicione dependências nativas** (precisam compilar no Windows). Frontend sem bundler: módulos ES servidos direto de `public/`.
+Node >= 20.12. **Não adicione dependências nativas** (precisam compilar no Windows).
+
+**Licença: proprietária** (`LICENSE`, © Ricardo Biazin; o produto será vendido). Só entram dependências com licença permissiva (MIT, ISC, BSD, Apache-2.0); nada de GPL, AGPL, LGPL, MPL ou SSPL, nem código copiado de projetos com essas licenças. Ao adicionar ou atualizar dependência, rode `npm run licencas` e commite o `THIRD_PARTY_NOTICES.md` (o teste `test/licencas.test.js` cobra os dois). Serviço externo novo (mapa, rotas, fontes) também entra lá, com os termos de uso comercial. Frontend sem bundler: módulos ES servidos direto de `public/`.
 
 ## Arquitetura (fluxo de dados)
 

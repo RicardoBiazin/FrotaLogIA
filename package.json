@@ -1,7 +1,9 @@
 {
   "name": "frotalogia",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Rastreamento de frota e logística de transporte em tempo real: veículos, viagens e centros de distribuição, por cliente.",
+  "author": "Ricardo Biazin",
+  "license": "UNLICENSED",
   "private": true,
   "type": "module",
   "engines": {
@@ -12,7 +14,8 @@
     "start": "node server/index.js",
     "test": "node --test",
     "device": "node scripts/fake-device.js",
-    "cliente": "node scripts/novo-cliente.js"
+    "cliente": "node scripts/novo-cliente.js",
+    "licencas": "node scripts/licencas.js"
   },
   "dependencies": {
     "express": "^4.21.2",

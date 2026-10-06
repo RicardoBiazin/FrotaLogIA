@@ -1,0 +1,28 @@
+FrotaLogIA
+Copyright (c) 2026 Ricardo Biazin. Todos os direitos reservados.
+
+Este software, incluindo o código-fonte, a documentação, o desenho da interface
+e os dados de exemplo (o "Software"), é propriedade exclusiva do titular acima e
+está protegido pela Lei nº 9.609/1998 (Lei do Software), pela Lei nº 9.610/1998
+(Lei de Direitos Autorais) e pelos tratados internacionais aplicáveis.
+
+Nenhuma licença é concedida por este arquivo. Sem autorização prévia e por escrito
+do titular, é proibido:
+
+  1. usar, copiar, modificar, adaptar, traduzir ou criar obras derivadas do Software;
+  2. vender, sublicenciar, alugar, emprestar, distribuir, publicar ou disponibilizar
+     o Software a terceiros, inclusive como serviço (SaaS) ou hospedado;
+  3. fazer engenharia reversa, descompilar ou remover avisos de propriedade.
+
+O uso por clientes depende de contrato de licença ou de prestação de serviço
+firmado com o titular, nos termos e prazos ali definidos.
+
+O Software inclui componentes de terceiros distribuídos sob as licenças dos seus
+autores (MIT, ISC, BSD e Apache-2.0), listados em THIRD_PARTY_NOTICES.md. Essas
+licenças continuam valendo para os respectivos componentes e não se estendem ao
+restante do Software.
+
+O SOFTWARE É FORNECIDO "NO ESTADO EM QUE SE ENCONTRA", SEM GARANTIA DE QUALQUER
+ESPÉCIE, SALVO O QUE FOR PREVISTO EM CONTRATO ESCRITO COM O TITULAR.
+
+Contato para licenciamento: Ricardo Biazin.
