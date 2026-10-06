@@ -35,6 +35,26 @@
           <li><i class="dot" data-status="offline"></i><b id="count-offline">0</b> sem sinal</li>
         </ul>
         <p class="kpis"><b id="kpi-viagens">0</b> viagens ativas · <b id="kpi-peso">0 t</b> em trânsito · <b id="kpi-cds">0</b> CDs</p>
+        <button id="kpi-atrasados" class="late-filter" type="button" aria-pressed="false" hidden>
+          <b id="kpi-atrasados-n">0</b> <span id="kpi-atrasados-txt">em atraso</span>
+        </button>
+      </section>
+
+      <section id="demo" class="demo" aria-label="Demonstração" hidden>
+        <h2 class="sub">Demonstração</h2>
+        <div class="demo-row">
+          <label class="sr-only" for="demo-qtd">Quantidade</label>
+          <select id="demo-qtd">
+            <option value="1">1</option>
+            <option value="5" selected>5</option>
+            <option value="10">10</option>
+            <option value="20">20</option>
+          </select>
+          <button type="button" class="action" data-demo-tipo="caminhao">+ Caminhões</button>
+          <button type="button" class="action" data-demo-tipo="carro">+ Carros</button>
+        </div>
+        <p class="demo-info"><span id="demo-status">Inclua veículos na frota simulada.</span>
+          <button id="demo-remover" class="link" type="button" hidden>Remover incluídos</button></p>
       </section>
 
       <div class="views" role="tablist" aria-label="Visualização">
@@ -105,7 +125,9 @@
             <div><dt>Volume</dt><dd id="trip-volume"></dd></div>
             <div><dt>Volumes</dt><dd id="trip-volumes"></dd></div>
             <div><dt>Valor</dt><dd id="trip-valor"></dd></div>
-            <div class="wide"><dt>Previsão de chegada</dt><dd id="trip-previsao"></dd></div>
+            <div class="wide"><dt>Prazo de entrega</dt><dd id="trip-previsao"></dd></div>
+            <div class="wide" id="trip-estimativa-wrap"><dt>Chegada estimada</dt><dd id="trip-estimativa"></dd></div>
+            <div class="wide late-box" id="trip-atraso-wrap"><dt>Atraso</dt><dd id="trip-atraso"></dd></div>
             <div class="wide"><dt>Remetente</dt><dd id="trip-remetente"></dd></div>
             <div class="wide"><dt>Destinatário</dt><dd id="trip-destinatario"></dd></div>
             <div class="wide secondary"><dt>Documento</dt><dd id="trip-documento"></dd></div>

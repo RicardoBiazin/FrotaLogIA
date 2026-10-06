@@ -11,6 +11,7 @@ const DEFAULT_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
 // Fonte dos rótulos: precisa existir no servidor de glyphs do estilo em uso.
 const DEFAULT_LABEL_FONT = 'Noto Sans Bold';
 const CD_COLOR = '#18282c';
+const LATE_COLOR = '#c62828';
 
 /** Polígono aproximando o círculo de `raioM` metros em volta do ponto (para a cerca do CD). */
 function circle(lon, lat, raioM, steps = 48) {
@@ -119,6 +120,20 @@ export class GeoView {
         'circle-pitch-alignment': 'map',
       },
     });
+    // Veículo atrasado: anel vermelho por baixo do ícone (o rótulo "+12 min" vem com as fontes).
+    map.addLayer({
+      id: 'atraso-anel',
+      type: 'circle',
+      source: 'assets',
+      filter: ['==', ['get', 'atrasado'], true],
+      paint: {
+        'circle-radius': 15,
+        'circle-color': LATE_COLOR,
+        'circle-opacity': 0.14,
+        'circle-stroke-color': LATE_COLOR,
+        'circle-stroke-width': 2.5,
+      },
+    });
     map.addLayer({
       id: 'assets-icon',
       type: 'symbol',
@@ -133,6 +148,22 @@ export class GeoView {
     });
     try {
       // Camadas separadas: se as fontes (glyphs) falharem, os ícones continuam funcionando.
+      map.addLayer({
+        id: 'atraso-rotulo',
+        type: 'symbol',
+        source: 'assets',
+        filter: ['==', ['get', 'atrasado'], true],
+        layout: {
+          'text-field': ['get', 'atrasoTxt'],
+          'text-font': [this.config.mapLabelFont || DEFAULT_LABEL_FONT],
+          'text-size': 11.5,
+          'text-anchor': 'bottom',
+          'text-offset': [0, -1.5],
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        paint: { 'text-color': '#ffffff', 'text-halo-color': LATE_COLOR, 'text-halo-width': 3 },
+      });
       map.addLayer({
         id: 'centros-rotulo',
         type: 'symbol',
@@ -231,7 +262,10 @@ export class GeoView {
       features: items.map((a) => ({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [a.x, a.y] },
-        properties: { id: a.id, nome: a.nome, tipo: a.tipo, status: a.status, rumo: a.rumo },
+        properties: {
+          id: a.id, nome: a.nome, tipo: a.tipo, status: a.status, rumo: a.rumo,
+          atrasado: Boolean(a.atrasoTxt), atrasoTxt: a.atrasoTxt ?? '',
+        },
       })),
     });
     return true;

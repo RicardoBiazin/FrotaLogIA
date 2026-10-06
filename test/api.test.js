@@ -11,6 +11,27 @@ import { createIngest } from '../server/ingest.js';
 import { createApp } from '../server/app.js';
 import { createHub } from '../server/hub.js';
 
+// Simulador de mentira: registra os pedidos de incluir/remover veículos de demonstração.
+const simFake = {
+  cliente: 'alfa',
+  incluidos: [],
+  extras() {
+    return this.incluidos.length;
+  },
+  addVehicles(tipo, quantidade) {
+    if (tipo !== 'caminhao' && tipo !== 'carro') throw new Error('tipo deve ser caminhao ou carro');
+    const ids = Array.from({ length: quantidade }, (_, i) => `${tipo}-${this.incluidos.length + i + 1}`);
+    this.incluidos.push(...ids);
+    return ids;
+  },
+  removeExtras() {
+    const ids = this.incluidos;
+    this.incluidos = [];
+    return ids;
+  },
+};
+const demo = { sim: simFake };
+
 let server;
 let hub;
 let base;
@@ -32,7 +53,7 @@ before(async () => {
   const eventos = new EventLog();
   const estoque = new EstoqueStore();
   const ingest = createIngest({ store, viagens, eventos, estoque, tenants });
-  const app = createApp({ config, store, viagens, eventos, estoque, ingest, tenants, version: '9.9.9' });
+  const app = createApp({ config, store, viagens, eventos, estoque, ingest, tenants, demo, version: '9.9.9' });
   server = http.createServer(app);
   hub = createHub({ server, store, viagens, eventos, estoque, tenants, batchMs: 50 });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -80,7 +101,11 @@ test('config e health são públicos e não expõem dados de clientes', async ()
 });
 
 test('sessão identifica o cliente pela chave', async () => {
-  assert.deepEqual(await (await get('/api/sessao', A)).json(), { cliente: { id: 'alfa', nome: 'Alfa Transportes' } });
+  assert.deepEqual(await (await get('/api/sessao', A)).json(), {
+    cliente: { id: 'alfa', nome: 'Alfa Transportes' },
+    demo: { extras: 0, maxExtras: 100 }, // alfa é o cliente do simulador neste teste
+  });
+  assert.equal((await (await get('/api/sessao', B)).json()).demo, null);
   assert.equal((await (await get('/api/sessao', B)).json()).cliente.id, 'beta');
 });
 
@@ -180,6 +205,35 @@ test('estoque: busca de produto e isolamento por cliente', async () => {
   assert.equal((await get('/api/centros/cd-1/estoque', B)).status, 404);
   const res = await post('/api/estoque', palete(), B); // beta não tem esse CD
   assert.match((await res.json()).rejected[0].erro, /não existe para este cliente/);
+});
+
+test('demonstração: inclui e remove veículos só no cliente do simulador', async () => {
+  const send = (method, body, headers) =>
+    fetch(`${base}/api/demo/veiculos`, {
+      method, headers: { 'content-type': 'application/json', ...headers }, body: body && JSON.stringify(body),
+    });
+  const ok = await send('POST', { tipo: 'caminhao', quantidade: 3 }, A);
+  assert.equal(ok.status, 201);
+  assert.deepEqual(await ok.json(), { incluidos: ['caminhao-1', 'caminhao-2', 'caminhao-3'], extras: 3 });
+  assert.equal((await send('POST', { tipo: 'aviao' }, A)).status, 400);
+  assert.equal((await send('POST', { tipo: 'carro', quantidade: 50 }, A)).status, 400);
+  assert.equal((await send('POST', { tipo: 'carro', quantidade: 1.5 }, A)).status, 400);
+  // outro cliente não mexe na demonstração, nem sem chave
+  assert.equal((await send('POST', { tipo: 'carro' }, B)).status, 403);
+  assert.equal((await send('DELETE', null, B)).status, 403);
+  assert.equal((await send('POST', { tipo: 'carro' }, {})).status, 401);
+  const rem = await send('DELETE', null, A);
+  assert.deepEqual((await rem.json()).removidos.length, 3);
+  assert.equal(simFake.extras(), 0);
+});
+
+test('viagem guarda a estimativa e recusa estimativa inválida', async () => {
+  const prazo = Date.now() + 60_000;
+  await post('/api/viagens', viagem({ id: 'VG-EST', previsao: prazo, estimativa: prazo + 5 * 60_000 }), A);
+  const v = await (await get('/api/viagens/VG-EST', A)).json();
+  assert.equal(v.estimativa, prazo + 5 * 60_000);
+  const bad = await post('/api/viagens', viagem({ id: 'VG-EST2', estimativa: 'logo' }), A);
+  assert.match((await bad.json()).rejected[0].erro, /estimativa/);
 });
 
 test('JSON inválido responde 400', async () => {

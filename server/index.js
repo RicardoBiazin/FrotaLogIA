@@ -30,7 +30,8 @@ const viagens = new ViagemStore();
 const eventos = new EventLog();
 const estoque = new EstoqueStore();
 const ingest = createIngest({ store, viagens, eventos, estoque, tenants });
-const app = createApp({ config, store, viagens, eventos, estoque, ingest, tenants, version: VERSION });
+const demo = { sim: null }; // preenchido quando o simulador terminar de subir
+const app = createApp({ config, store, viagens, eventos, estoque, ingest, tenants, demo, version: VERSION });
 const server = http.createServer(app);
 const hub = createHub({ server, store, viagens, eventos, estoque, tenants, batchMs: config.batchMs });
 
@@ -69,9 +70,16 @@ server.listen(config.port, host, () => {
       );
       return;
     }
-    startSimulation({ ingest, config, cliente: sim.id, centros: sim.centros })
-      .then((sim) => {
-        simulation = sim;
+    startSimulation({
+      ingest,
+      config,
+      cliente: sim.id,
+      centros: sim.centros,
+      removeAsset: (cliente, id) => store.remove(cliente, id),
+    })
+      .then((started) => {
+        simulation = started;
+        demo.sim = started;
       })
       .catch((err) => console.error('Falha ao iniciar o simulador:', err));
   }

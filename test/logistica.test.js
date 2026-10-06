@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   applyViagem, resumoCentro, matchesQuery, formatPeso, formatVolume, formatPrevisao,
+  atrasoMs, formatDuracao,
 } from '../public/js/logistica.js';
 
 const v = (over) => ({
@@ -66,4 +67,25 @@ test('busca encontra pelo veículo e pelos dados do transporte', () => {
   assert.equal(matchesQuery(asset, v(), 'cd b'), true);
   assert.equal(matchesQuery(asset, v(), 'pneus'), false);
   assert.equal(matchesQuery(asset, null, 'bebidas'), false);
+});
+
+test('atraso: prazo vencido, estimativa depois do prazo e tolerância de 1 min', () => {
+  const now = 1_000_000_000;
+  const MIN = 60_000;
+  const viagem = (over) => v({ status: 'em_transito', previsao: now + 10 * MIN, estimativa: null, ...over });
+  assert.equal(atrasoMs(viagem(), now), 0); // no prazo
+  assert.equal(atrasoMs(viagem({ previsao: now - 12 * MIN }), now), 12 * MIN); // prazo vencido
+  assert.equal(atrasoMs(viagem({ estimativa: now + 25 * MIN }), now), 15 * MIN); // vai chegar depois
+  assert.equal(atrasoMs(viagem({ estimativa: now + 5 * MIN }), now), 0); // vai chegar antes
+  assert.equal(atrasoMs(viagem({ previsao: now - 30_000 }), now), 0); // 30 s: dentro da tolerância
+  assert.equal(atrasoMs(viagem({ previsao: now - 12 * MIN, status: 'entregue' }), now), 0); // já chegou
+  assert.equal(atrasoMs(viagem({ previsao: now - 12 * MIN, status: 'descarregando' }), now), 0);
+  assert.equal(atrasoMs(viagem({ previsao: null }), now), 0); // sem prazo
+  assert.equal(atrasoMs(undefined, now), 0); // sem viagem
+});
+
+test('duração do atraso em texto', () => {
+  assert.equal(formatDuracao(30_000), '1 min'); // nunca "0 min"
+  assert.equal(formatDuracao(12 * 60_000), '12 min');
+  assert.equal(formatDuracao(65 * 60_000), '1 h 05 min');
 });

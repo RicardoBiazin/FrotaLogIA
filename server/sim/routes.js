@@ -40,6 +40,37 @@ export const GEO_ROUTES = {
     pontas: [{ nome: 'Trindade' }, { nome: 'Campeche' }],
     perfil: 'ultimaMilha',
   },
+  // Rotas usadas pelos veículos incluídos na demonstração (botões "+ caminhão" / "+ carro").
+  'sao-jose-palhoca': {
+    nome: 'CD São José ↔ CD Palhoça',
+    waypoints: [[-27.59, -48.63], [-27.6455, -48.669]],
+    pontas: [{ nome: 'CD São José', cd: 'cd-sao-jose' }, { nome: 'CD Palhoça', cd: 'cd-palhoca' }],
+    perfil: 'transferencia',
+  },
+  'aeroporto-sao-jose': {
+    nome: 'Hub Aeroporto ↔ CD São José',
+    waypoints: [[-27.6705, -48.5528], [-27.59, -48.63]],
+    pontas: [{ nome: 'Hub Aeroporto', cd: 'hub-aeroporto' }, { nome: 'CD São José', cd: 'cd-sao-jose' }],
+    perfil: 'aereo',
+  },
+  'biguacu-centro': {
+    nome: 'CD Biguaçu → Centro',
+    waypoints: [[-27.495, -48.655], [-27.5985, -48.5435]],
+    pontas: [{ nome: 'CD Biguaçu', cd: 'cd-biguacu' }, { nome: 'Centro de Florianópolis' }],
+    perfil: 'transferencia',
+  },
+  'centro-canasvieiras': {
+    nome: 'Centro → Canasvieiras',
+    waypoints: [[-27.5985, -48.5435], [-27.429, -48.459]],
+    pontas: [{ nome: 'Centro de Florianópolis' }, { nome: 'Canasvieiras' }],
+    perfil: 'ultimaMilha',
+  },
+  'kobrasol-coqueiros': {
+    nome: 'Kobrasol → Coqueiros',
+    waypoints: [[-27.594, -48.616], [-27.603, -48.578]],
+    pontas: [{ nome: 'Kobrasol' }, { nome: 'Coqueiros' }],
+    perfil: 'ultimaMilha',
+  },
 };
 
 // Caminhos dentro das plantas, em metros [x, y] (ver ../demo.js)

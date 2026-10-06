@@ -7,6 +7,7 @@ import { publicAsset } from './store.js';
 import { TIPOS } from './normalize.js';
 import { VIAGEM_STATUS } from './viagens.js';
 import { traccarToPositions } from './adapters/traccar.js';
+import { MAX_EXTRAS } from './sim/index.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MAX_BATCH = 1000;
@@ -49,7 +50,11 @@ const publicCentro = (c) => ({
   planta: c.planta ? { ...c.planta, id: c.id, nome: c.nome } : null,
 });
 
-export function createApp({ config, store, viagens, eventos, estoque, ingest, tenants, version = null }) {
+/**
+ * @param demo { sim } — simulador em execução (ou sim: null). Só o cliente que ele alimenta
+ *             pode incluir/remover veículos de demonstração.
+ */
+export function createApp({ config, store, viagens, eventos, estoque, ingest, tenants, demo = { sim: null }, version = null }) {
   const app = express();
   app.disable('x-powered-by');
   app.use(securityHeaders);
@@ -92,7 +97,35 @@ export function createApp({ config, store, viagens, eventos, estoque, ingest, te
   // ---- Do cliente ----
   api.use(requireTenant);
 
-  api.get('/sessao', (req, res) => res.json({ cliente: { id: req.tenant.id, nome: req.tenant.nome } }));
+  const isDemo = (req) => Boolean(demo.sim) && demo.sim.cliente === req.cliente;
+
+  api.get('/sessao', (req, res) =>
+    res.json({
+      cliente: { id: req.tenant.id, nome: req.tenant.nome },
+      demo: isDemo(req) ? { extras: demo.sim.extras(), maxExtras: MAX_EXTRAS } : null,
+    }),
+  );
+
+  // Demonstração: incluir e remover veículos simulados com a frota rodando.
+  api.post('/demo/veiculos', (req, res) => {
+    if (!isDemo(req)) return res.status(403).json({ erro: 'disponível só no cliente de demonstração, com o simulador ligado' });
+    const tipo = req.body?.tipo;
+    const quantidade = Number(req.body?.quantidade ?? 1);
+    if (!Number.isInteger(quantidade) || quantidade < 1 || quantidade > 20) {
+      return res.status(400).json({ erro: 'quantidade deve ser um número inteiro de 1 a 20' });
+    }
+    try {
+      const ids = demo.sim.addVehicles(tipo, quantidade);
+      res.status(201).json({ incluidos: ids, extras: demo.sim.extras() });
+    } catch (err) {
+      res.status(400).json({ erro: err.message });
+    }
+  });
+
+  api.delete('/demo/veiculos', (req, res) => {
+    if (!isDemo(req)) return res.status(403).json({ erro: 'disponível só no cliente de demonstração, com o simulador ligado' });
+    res.json({ removidos: demo.sim.removeExtras(), extras: 0 });
+  });
 
   api.get('/centros', (req, res) => res.json(req.tenant.centros.map(publicCentro)));
 

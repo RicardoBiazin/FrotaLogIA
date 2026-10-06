@@ -3,12 +3,14 @@
 Logística de transporte em tempo real, **por cliente**: cada empresa vê a própria rede, com todos os veículos na estrada e nos centros de distribuição (CDs).
 
 - **Mapa** (MapLibre GL) com os veículos animados e os CDs. Cada CD mostra quantos veículos estão no pátio e quantos estão a caminho.
-- **Dados do transporte:** ao clicar num veículo, o card mostra a viagem. Ela traz origem e destino, carga, peso, volume, quantidade de volumes, valor, remetente, destinatário, documento (CT-e) e previsão de chegada.
+- **Dados do transporte:** ao clicar num veículo, o card mostra a viagem. Ela traz origem e destino, carga, peso, volume, quantidade de volumes, valor, remetente, destinatário, documento (CT-e), prazo de entrega e chegada estimada.
+- **Atrasos:** caminhões e carros fora do prazo ganham um anel vermelho no mapa com o tempo de atraso ("+12 min") e o aviso "Atrasado 12 min" na lista. O contador "veículos em atraso" no resumo mostra só os atrasados.
 - **Centros de distribuição:** clique num CD para ver o pátio, as chegadas previstas e as últimas entradas e saídas. "Abrir planta" mostra o interior, com as empilhadeiras em tempo real e os caminhões encostados nas docas.
 - **Prateleiras e estoque:** na planta, cada prateleira aparece dividida em posições, coloridas pelos níveis ocupados. Clique numa posição para ver o que há em cada nível: produto, SKU, depositante, quantidade, peso, lote, data de entrada e validade, com aviso de vencido ou vencendo. Busque um produto, SKU ou lote para ver em que endereço e em que CD ele está; as posições acendem na planta.
 - **Movimentação:** entradas e saídas dos CDs são detectadas sozinhas, por uma cerca virtual em volta de cada CD.
 - **Multi-cliente:** cada empresa entra com a própria chave de acesso e só enxerga a própria frota, tanto na API quanto no WebSocket.
-- **Simulador** com uma rede de exemplo na Grande Florianópolis: 4 CDs, 8 veículos com viagens, 5 empilhadeiras e cerca de 250 paletes nas prateleiras, com separação, recebimento e expedição acontecendo. Assim dá para ver tudo funcionando antes de ligar dados reais.
+- **Simulador** com uma rede de exemplo na Grande Florianópolis: 4 CDs, 8 veículos com viagens, 5 empilhadeiras e cerca de 250 paletes nas prateleiras, com separação, recebimento e expedição acontecendo. Congestionamentos ocasionais fazem algumas entregas atrasar.
+- **Demonstração:** no cliente de exemplo, o quadro "Demonstração" inclui caminhões e carros (1 a 20 por vez, até 100) com a frota rodando, em 11 rotas da região, e remove os incluídos com um clique. Assim dá para ver tudo funcionando antes de ligar dados reais.
 
 ## Começando
 
@@ -105,11 +107,13 @@ Dentro de um CD (planta, sem GPS), `espaco` é o id do CD e `x`/`y` vêm em metr
   "remetente": { "nome": "Indústria Vale Verde", "documento": "12.345.678/0001-90" },
   "destinatario": { "nome": "Mercado Bela Vista" },
   "carga": { "descricao": "Bebidas", "pesoKg": 12400, "volumeM3": 38, "volumes": 22, "valor": 150000 },
-  "previsao": "2026-10-06T16:10:00Z" }
+  "previsao": "2026-10-06T16:10:00Z", "estimativa": "2026-10-06T16:22:00Z" }
 ```
 
 - `status` pode ser `planejada`, `carregando`, `em_transito`, `descarregando`, `entregue` ou `cancelada`.
-- Mande a viagem de novo, com o mesmo `id`, sempre que algo mudar (status, previsão).
+- `previsao` é o **prazo combinado** de chegada. `estimativa` (opcional) é a chegada prevista atualizada, por exemplo calculada pelo rastreador ou pelo TMS.
+- A viagem fica **atrasada** quando o prazo já passou ou quando a estimativa cai depois dele, com tolerância de 1 minuto. Isso vale enquanto a carga não chegou (`planejada`, `carregando` ou `em_transito`).
+- Mande a viagem de novo, com o mesmo `id`, sempre que algo mudar (status, estimativa).
 - Quando `origem.cd` ou `destino.cd` aponta para um CD, a viagem entra no painel daquele CD.
 
 ### Estoque (posição-palete)
@@ -144,7 +148,9 @@ Tudo, exceto `/api/config` e `/api/health`, exige o header `x-api-key` com a cha
 | `GET /api/centros/:cd/estoque` | Todas as posições ocupadas de um CD. |
 | `GET /api/estoque?q=&cd=` | Onde está o produto: busca por SKU, descrição, depositante, lote ou endereço em todos os CDs. |
 | `GET /api/eventos?limit=` | Últimas entradas e saídas de CD. |
-| `GET /api/sessao` | Qual cliente a chave identifica. |
+| `GET /api/sessao` | Qual cliente a chave identifica e, no cliente de demonstração, quantos veículos foram incluídos. |
+| `POST /api/demo/veiculos` | Só no cliente do simulador: `{ "tipo": "caminhao" \| "carro", "quantidade": 1..20 }` inclui veículos. |
+| `DELETE /api/demo/veiculos` | Só no cliente do simulador: remove os veículos incluídos (as viagens deles viram canceladas). |
 | `GET /api/config`, `/api/health` | Configuração da tela e saúde (públicas, sem dados de cliente). |
 | `WS /ws` | Mande `{ "type": "auth", "chave": "…" }`. Em seguida chegam o snapshot do cliente e depois os lotes de atualização. Chave errada fecha com o código 4401. |
 
@@ -227,7 +233,7 @@ public/
   js/estoque.js     endereços, ocupação e validade (código puro, também usado pelo servidor)
   js/interp.js      interpolação do movimento (código puro, testado)
   js/geoView.js     mapa (MapLibre)    js/indoorView.js  planta do CD (canvas)
-test/             75 testes (node --test)
+test/             79 testes (node --test)
 scripts/          novo-cliente.js, dados-teste.js, fake-device.js, licencas.js
 FrotaLogIA.bat    menu do Windows: instala, testa, inicia, cria cliente
 ```

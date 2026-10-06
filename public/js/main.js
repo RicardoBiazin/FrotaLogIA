@@ -5,7 +5,7 @@ import { GeoView } from './geoView.js';
 import { IndoorView } from './indoorView.js';
 import { TIPOS, STATUS, STATUS_IDS, tipoOf, glyphSvg } from './icons.js';
 import {
-  VIAGEM_LABEL, applyViagem, resumoCentro, matchesQuery,
+  VIAGEM_LABEL, applyViagem, resumoCentro, matchesQuery, atrasoMs, formatDuracao,
   formatPeso, formatVolume, formatValor, formatPrevisao, formatHora,
 } from './logistica.js';
 import {
@@ -50,6 +50,8 @@ const state = {
   centros: [],
   estoque: new Map(), // cd → Map<endereco, item> (CDs com prateleiras)
   selectedSlot: null, // { cd, rua, posicao }
+  soAtrasados: false, // filtro do contador "em atraso"
+  demo: null, // { extras, maxExtras } no cliente de demonstração
   tipos: new Set(TIPOS.map((t) => t.id)),
   query: '',
   view: 'map', // 'map' | 'indoor'
@@ -184,21 +186,30 @@ function onEvento(evento) {
 
 // ---------- Filtros e visibilidade ----------
 
+/** Atraso da viagem ativa do veículo, em ms (0 = no prazo ou sem viagem). */
+const atrasoDe = (id, now = Date.now()) => atrasoMs(state.viagemPorVeiculo.get(id), now);
+
 function matches(d) {
   if (d.id === state.selectedId) return true;
   if (!state.tipos.has(d.tipo)) return false;
+  if (state.soAtrasados && !atrasoDe(d.id)) return false;
   return matchesQuery(d, state.viagemPorVeiculo.get(d.id), state.query);
 }
 
 /** Itens amostrados no instante `now` para a visualização pedida. */
 function visibleItems(now, view = state.view) {
   const items = [];
+  const wallNow = Date.now(); // `now` é o relógio da animação; o atraso usa o de parede
   for (const asset of state.assets.values()) {
     const d = asset.data;
     if (view === 'map' ? d.espaco : d.espaco !== state.space?.id) continue;
     if (!matches(d)) continue;
     const p = asset.sample(now);
-    items.push({ id: d.id, nome: d.nome, tipo: d.tipo, status: d.status, x: p.x, y: p.y, rumo: p.rumo });
+    const atraso = d.espaco ? 0 : atrasoDe(d.id, wallNow);
+    items.push({
+      id: d.id, nome: d.nome, tipo: d.tipo, status: d.status, x: p.x, y: p.y, rumo: p.rumo,
+      atrasoTxt: atraso ? `+${formatDuracao(atraso)}` : '',
+    });
   }
   return items;
 }
@@ -283,6 +294,17 @@ function updateSummary() {
   $('#kpi-viagens').textContent = fmt(state.viagens.size);
   $('#kpi-peso').textContent = formatPeso(pesoKg);
   $('#kpi-cds').textContent = fmt(state.centros.length);
+
+  const now = Date.now();
+  let atrasados = 0;
+  for (const v of state.viagens.values()) if (v.veiculo && state.assets.has(v.veiculo) && atrasoMs(v, now)) atrasados++;
+  const botao = $('#kpi-atrasados');
+  botao.hidden = atrasados === 0 && !state.soAtrasados;
+  botao.dataset.zero = String(atrasados === 0);
+  $('#kpi-atrasados-n').textContent = fmt(atrasados);
+  $('#kpi-atrasados-txt').textContent = state.soAtrasados
+    ? `${atrasados === 1 ? 'veículo' : 'veículos'} em atraso · mostrando só eles`
+    : `${atrasados === 1 ? 'veículo' : 'veículos'} em atraso · mostrar só eles`;
 }
 
 /** Linha curta do transporte na lista: onde está ou para onde vai. */
@@ -298,20 +320,22 @@ function createRow(d) {
   const li = document.createElement('li');
   li.innerHTML = `<button type="button" class="row" data-id="">
     <span class="glyph"></span>
-    <span><span class="name"></span><span class="code"></span><span class="trip-line"></span></span>
+    <span><span class="name"></span><span class="code"></span><span class="trip-line"></span><span class="late"></span></span>
     <span class="meta"><span class="speed"></span><span class="state"></span></span>
   </button>`;
   li.querySelector('.glyph').innerHTML = glyphSvg(d.tipo, 22);
   return li;
 }
 
-function fillRow(li, d, line) {
+function fillRow(li, d, line, atraso) {
   const button = li.firstElementChild;
   button.dataset.id = d.id;
   button.setAttribute('aria-pressed', String(d.id === state.selectedId));
   li.querySelector('.name').textContent = d.nome;
   li.querySelector('.code').textContent = d.id;
   li.querySelector('.trip-line').textContent = line;
+  li.querySelector('.late').textContent = atraso ? `Atrasado ${formatDuracao(atraso)}` : '';
+  button.classList.toggle('is-late', Boolean(atraso));
   li.querySelector('.speed').textContent = d.status === 'offline' ? '—' : `${fmt(d.velocidade)} km/h`;
   const stateEl = li.querySelector('.state');
   stateEl.textContent = STATUS[d.status].label;
@@ -334,9 +358,10 @@ function renderList() {
       rows.set(d.id, li);
     }
     const line = tripLine(d);
-    const signature = `${d.nome}|${d.status}|${Math.round(d.velocidade)}|${d.id === state.selectedId}|${line}`;
+    const atraso = d.espaco ? 0 : atrasoDe(d.id);
+    const signature = `${d.nome}|${d.status}|${Math.round(d.velocidade)}|${d.id === state.selectedId}|${line}|${atraso ? formatDuracao(atraso) : ''}`;
     if (li.dataset.sig !== signature) {
-      fillRow(li, d, line);
+      fillRow(li, d, line, atraso);
       li.dataset.sig = signature;
     }
     const expected = previous ? previous.nextSibling : els.list.firstChild;
@@ -435,7 +460,17 @@ function updateDetail() {
     setText('#trip-volume', formatVolume(v.carga.volumeM3));
     setText('#trip-volumes', v.carga.volumes === null ? '—' : fmt(v.carga.volumes));
     setText('#trip-valor', formatValor(v.carga.valor));
-    setText('#trip-previsao', formatPrevisao(v.previsao, Date.now()));
+    const agora = Date.now();
+    setText('#trip-previsao', formatPrevisao(v.previsao, agora));
+    $('#trip-estimativa-wrap').hidden = !v.estimativa;
+    if (v.estimativa) setText('#trip-estimativa', formatPrevisao(v.estimativa, agora));
+    const atraso = atrasoMs(v, agora);
+    $('#trip-atraso-wrap').hidden = !atraso;
+    if (atraso) {
+      setText('#trip-atraso', v.previsao < agora
+        ? `${formatDuracao(atraso)} além do prazo`
+        : `deve chegar ${formatDuracao(atraso)} depois do prazo`);
+    }
     setText('#trip-remetente', v.remetente.nome + (v.remetente.documento ? ` (${v.remetente.documento})` : ''));
     setText('#trip-destinatario', v.destinatario.nome + (v.destinatario.documento ? ` (${v.destinatario.documento})` : ''));
     setText('#trip-documento', v.documento ?? '—');
@@ -496,7 +531,7 @@ function updateCdDetail() {
     r.chegando.map((v) => ({
       id: v.veiculo,
       text: state.assets.get(v.veiculo)?.data.nome ?? v.veiculo ?? v.id,
-      meta: `${formatPrevisao(v.previsao, now)} · ${formatPeso(v.carga.pesoKg)}`,
+      meta: `${atrasoMs(v, now) ? `atrasado ${formatDuracao(atrasoMs(v, now))} · ` : ''}${formatPrevisao(v.estimativa ?? v.previsao, now)} · ${formatPeso(v.carga.pesoKg)}`,
     })),
     'Nenhuma chegada prevista.',
   );
@@ -808,6 +843,61 @@ function selectSlot(slot, { open = false } = {}) {
   refreshUi();
 }
 
+// ---------- Demonstração: incluir e remover veículos ----------
+
+async function apiSend(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: { 'content-type': 'application/json', ...(state.chave && { 'x-api-key': state.chave }) },
+    body: body && JSON.stringify(body),
+  });
+  if (res.status === 401) {
+    logout();
+    throw new Error('sessão expirada');
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.erro ?? `HTTP ${res.status}`);
+  return data;
+}
+
+function renderDemo(mensagem) {
+  const box = $('#demo');
+  box.hidden = !state.demo;
+  if (!state.demo) return;
+  const { extras, maxExtras } = state.demo;
+  $('#demo-remover').hidden = extras === 0;
+  $('#demo-remover').textContent = `Remover incluídos (${extras})`;
+  setText('#demo-status', mensagem ?? (extras
+    ? `${extras} de ${maxExtras} veículos incluídos.`
+    : 'Inclua veículos na frota simulada.'));
+}
+
+async function demoIncluir(tipo) {
+  const quantidade = Number($('#demo-qtd').value);
+  const botoes = document.querySelectorAll('[data-demo-tipo]');
+  botoes.forEach((b) => (b.disabled = true));
+  try {
+    const r = await apiSend('POST', '/api/demo/veiculos', { tipo, quantidade });
+    state.demo.extras = r.extras;
+    const nome = tipo === 'caminhao' ? 'caminhão' : 'carro';
+    renderDemo(`${r.incluidos.length} ${r.incluidos.length === 1 ? nome : `${nome === 'caminhão' ? 'caminhões' : 'carros'}`} incluído${r.incluidos.length === 1 ? '' : 's'}: ${r.incluidos.join(', ')}.`);
+  } catch (err) {
+    renderDemo(`Não foi possível incluir: ${err.message}`);
+  } finally {
+    botoes.forEach((b) => (b.disabled = false));
+  }
+}
+
+async function demoRemover() {
+  try {
+    const r = await apiSend('DELETE', '/api/demo/veiculos');
+    state.demo.extras = 0;
+    renderDemo(`${r.removidos.length} veículos removidos.`);
+  } catch (err) {
+    renderDemo(`Não foi possível remover: ${err.message}`);
+  }
+}
+
 function bindEvents() {
   els.search.addEventListener('input', () => {
     state.query = els.search.value;
@@ -856,6 +946,15 @@ function bindEvents() {
     selectCd(id);
   });
   $('#sair').addEventListener('click', logout);
+  for (const b of document.querySelectorAll('[data-demo-tipo]')) {
+    b.addEventListener('click', () => demoIncluir(b.dataset.demoTipo));
+  }
+  $('#demo-remover').addEventListener('click', demoRemover);
+  $('#kpi-atrasados').addEventListener('click', () => {
+    state.soAtrasados = !state.soAtrasados;
+    $('#kpi-atrasados').setAttribute('aria-pressed', String(state.soAtrasados));
+    refreshUi();
+  });
   $('#slot-close').addEventListener('click', () => selectSlot(null));
   $('#estoque-busca-list').addEventListener('click', (e) => {
     const row = e.target.closest('[data-endereco]');
@@ -936,12 +1035,16 @@ async function boot() {
     $('#sair').hidden = false;
   }
 
+  const sessao = await api('/api/sessao');
+  $('#cliente-nome').textContent = sessao.cliente.nome;
+  state.demo = sessao.demo;
   state.centros = await api('/api/centros');
   const comPlanta = state.centros.filter((c) => c.planta);
 
   buildTypeFilters();
   buildCdPicker();
   bindEvents();
+  renderDemo();
 
   indoor = new IndoorView($('#indoor'), els.indoorCanvas, {
     onSelect: select,

@@ -11,6 +11,30 @@ export const VIAGEM_LABEL = {
 };
 export const ENCERRADAS = new Set(['entregue', 'cancelada']);
 
+// Atraso só conta a partir de 1 min, para o aviso não piscar na borda do prazo.
+export const ATRASO_MIN_MS = 60_000;
+// Status em que a carga ainda não chegou ao destino.
+const A_CAMINHO = new Set(['planejada', 'carregando', 'em_transito']);
+
+/**
+ * Atraso da viagem em ms (0 = no prazo). `previsao` é o prazo combinado; `estimativa`,
+ * opcional, é a previsão atualizada de chegada. Atrasada quando o prazo já passou ou
+ * quando a estimativa indica chegada depois dele.
+ */
+export function atrasoMs(viagem, now) {
+  if (!viagem?.previsao || !A_CAMINHO.has(viagem.status)) return 0;
+  const chegada = Math.max(now, viagem.estimativa ?? 0);
+  const atraso = chegada - viagem.previsao;
+  return atraso >= ATRASO_MIN_MS ? atraso : 0;
+}
+
+/** "4 min", "1 h 05 min". */
+export function formatDuracao(ms) {
+  const min = Math.max(1, Math.round(ms / 60_000));
+  if (min < 60) return `${min} min`;
+  return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')} min`;
+}
+
 const nf = (digits) =>
   new Intl.NumberFormat('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
@@ -37,9 +61,9 @@ export function formatHora(ts) {
 export function formatPrevisao(previsao, now) {
   if (!previsao) return '—';
   const min = Math.round((previsao - now) / 60_000);
-  if (min > 0) return `${formatHora(previsao)} (em ${min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${min % 60} min`})`;
+  if (min > 0) return `${formatHora(previsao)} (em ${formatDuracao(previsao - now)})`;
   if (min === 0) return `${formatHora(previsao)} (chegando)`;
-  return `${formatHora(previsao)} (atrasada ${-min} min)`;
+  return `${formatHora(previsao)} (atrasada ${formatDuracao(now - previsao)})`;
 }
 
 /**

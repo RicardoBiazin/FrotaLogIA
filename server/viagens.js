@@ -2,11 +2,13 @@
 // Chegam por POST /api/viagens (vindas do TMS/ERP do cliente) ou do simulador.
 //
 // Formato aceito (campos extras são ignorados):
-//   { id, veiculo?, status, documento?, previsao?,
+//   { id, veiculo?, status, documento?, previsao?, estimativa?,
 //     origem:  { nome, cd?, lat?, lon? },   destino: { nome, cd?, lat?, lon? },
 //     remetente: { nome, documento? },      destinatario: { nome, documento? },
 //     carga: { descricao, pesoKg?, volumeM3?, volumes?, valor? } }
-// Unidades: peso em kg, volume em m³, valor em R$, previsao em ISO 8601 ou epoch (ms ou s).
+// Unidades: peso em kg, volume em m³, valor em R$; datas em ISO 8601 ou epoch (ms ou s).
+// previsao = prazo combinado de chegada; estimativa = previsão atualizada (ex.: do rastreador).
+// A viagem está atrasada quando o prazo passou ou a estimativa fica depois dele.
 import { EventEmitter } from 'node:events';
 
 export const VIAGEM_STATUS = ['planejada', 'carregando', 'em_transito', 'descarregando', 'entregue', 'cancelada'];
@@ -80,6 +82,8 @@ export function normalizeViagem(raw, now = Date.now()) {
 
   const previsao = parseTs(raw.previsao);
   if (Number.isNaN(previsao)) return fail('previsao inválida');
+  const estimativa = parseTs(raw.estimativa);
+  if (Number.isNaN(estimativa)) return fail('estimativa inválida');
 
   return {
     ok: true,
@@ -91,6 +95,7 @@ export function normalizeViagem(raw, now = Date.now()) {
       ...partes,
       carga,
       previsao,
+      estimativa,
       atualizadoEm: now,
     },
   };
