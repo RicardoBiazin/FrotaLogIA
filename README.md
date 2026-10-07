@@ -6,6 +6,7 @@ Logística de transporte em tempo real, **por cliente**: cada empresa vê a pró
 - **Dados do transporte:** ao clicar num veículo, o card mostra a viagem. Ela traz origem e destino, carga, peso, volume, quantidade de volumes, valor, remetente, destinatário, documento (CT-e), prazo de entrega e chegada estimada.
 - **Atrasos:** caminhões e carros fora do prazo ganham um anel vermelho no mapa com o tempo de atraso ("+12 min") e o aviso "Atrasado 12 min" na lista. O contador "veículos em atraso" no resumo mostra só os atrasados.
 - **Centros de distribuição:** clique num CD para ver o pátio, as chegadas previstas e as últimas entradas e saídas. "Abrir planta" mostra o interior, com as empilhadeiras em tempo real e os caminhões encostados nas docas.
+- **CD em 3D:** na aba Centros, "Ver em 3D" mostra o CD em vista isométrica, com as prateleiras e os paletes em cada nível (cor pela família do produto), as empilhadeiras se movendo em tempo real e os caminhões encostados nas docas. Arraste para girar, use a roda do mouse para aproximar e o botão direito (ou Shift) para mover. Clicar num palete ou numa empilhadeira abre o mesmo card da planta, e a busca acende os paletes encontrados.
 - **Prateleiras e estoque:** na planta, cada prateleira aparece dividida em posições, coloridas pelos níveis ocupados. Clique numa posição para ver o que há em cada nível: produto, SKU, depositante, quantidade, peso, lote, data de entrada e validade, com aviso de vencido ou vencendo. Busque um produto, SKU ou lote para ver em que endereço e em que CD ele está; as posições acendem na planta.
 - **Movimentação:** entradas e saídas dos CDs são detectadas sozinhas, por uma cerca virtual em volta de cada CD.
 - **Multi-cliente:** cada empresa entra com a própria chave de acesso e só enxerga a própria frota, tanto na API quanto no WebSocket.
@@ -233,7 +234,8 @@ public/
   js/estoque.js     endereços, ocupação e validade (código puro, também usado pelo servidor)
   js/interp.js      interpolação do movimento (código puro, testado)
   js/geoView.js     mapa (MapLibre)    js/indoorView.js  planta do CD (canvas)
-test/             79 testes (node --test)
+  js/isoView.js     CD em 3D isométrico (Three.js, carregado só quando aberto)
+test/             81 testes (node --test)
 scripts/          novo-cliente.js, dados-teste.js, fake-device.js, licencas.js
 FrotaLogIA.bat    menu do Windows: instala, testa, inicia, cria cliente
 ```

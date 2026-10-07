@@ -51,6 +51,7 @@ const state = {
   estoque: new Map(), // cd → Map<endereco, item> (CDs com prateleiras)
   selectedSlot: null, // { cd, rua, posicao }
   soAtrasados: false, // filtro do contador "em atraso"
+  modo3d: false, // planta do CD em 3D isométrico
   demo: null, // { extras, maxExtras } no cliente de demonstração
   tipos: new Set(TIPOS.map((t) => t.id)),
   query: '',
@@ -66,6 +67,7 @@ const state = {
 
 let geo = null;
 let indoor = null;
+let iso = null; // vista 3D (carregada só quando aberta)
 const rows = new Map();
 const chipCounts = new Map();
 
@@ -237,7 +239,8 @@ function frame(now) {
       if (target) geo.follow(target.x, target.y);
     }
   } else {
-    indoor?.render(items, dockedItems());
+    if (state.modo3d && iso?.ready) iso.render(items, dockedItems());
+    else indoor?.render(items, dockedItems());
   }
 }
 
@@ -614,6 +617,7 @@ function showSpace(cdId) {
   state.space = cd.planta;
   els.cdSelect.value = cd.id;
   indoor.setSpace(state.space);
+  iso?.setSpace(state.space);
   updateEstoqueView();
 }
 
@@ -625,7 +629,10 @@ function setView(view) {
   els.fit.hidden = view !== 'map';
   els.cdPicker.hidden = view !== 'indoor';
   if (view === 'map') geo?.resize();
-  else indoor?.resize();
+  else {
+    indoor?.resize();
+    iso?.resize();
+  }
   updateCdDetail();
   syncIndoorInsets();
 }
@@ -636,6 +643,7 @@ async function select(id) {
   setFollow(false);
   geo?.setSelected(id);
   indoor?.setSelected(id);
+  iso?.setSelected(id);
   applyTrail();
 
   const asset = id ? state.assets.get(id) : null;
@@ -727,6 +735,12 @@ function updateEstoqueView() {
     }
     const sel = state.selectedSlot?.cd === state.space.id ? state.selectedSlot : null;
     indoor.setEstoque(ocupacaoPorPosicao(itens), destaque, sel);
+    if (iso) {
+      const enderecos = state.query.trim().length >= 2
+        ? new Set(encontrados.filter((i) => i.cd === state.space.id).map((i) => i.endereco))
+        : null;
+      iso.setEstoque(state.estoque.get(state.space.id) ?? new Map(), enderecos, sel);
+    }
   }
 
   const box = $('#estoque-busca');
@@ -898,6 +912,62 @@ async function demoRemover() {
   }
 }
 
+// ---------- Vista 3D isométrica do CD ----------
+
+async function setModo3d(on) {
+  const botao = $('#modo-3d');
+  if (on && !iso) {
+    botao.disabled = true;
+    botao.textContent = 'Carregando 3D…';
+    try {
+      const { IsoView, FAMILIAS } = await import('./isoView.js');
+      iso = new IsoView($('#iso'), {
+        onSelect: select,
+        onSelectSlot: (cell) => selectSlot(cell && state.space ? { cd: state.space.id, ...cell } : null),
+      });
+      $('#iso-familias').replaceChildren(
+        ...FAMILIAS.map((f) => {
+          const li = document.createElement('li');
+          const dot = document.createElement('i');
+          dot.style.background = f.cor;
+          li.append(dot, f.nome);
+          return li;
+        }),
+      );
+      $('#iso').hidden = false; // o renderizador precisa do tamanho do contêiner
+      await iso.init();
+      iso.setSelected(state.selectedId);
+      if (state.space) iso.setSpace(state.space);
+    } catch (err) {
+      console.error(err);
+      iso = null;
+      on = false;
+      botao.textContent = 'Ver em 3D';
+      $('#iso').hidden = true;
+      alert(`Não foi possível abrir a vista 3D: ${err.message}. O navegador precisa de WebGL ativado.`);
+    } finally {
+      botao.disabled = false;
+    }
+  }
+  state.modo3d = on;
+  try {
+    localStorage.setItem('frotalogia.3d', on ? '1' : '0');
+  } catch {
+    /* preferência só nesta sessão */
+  }
+  botao.setAttribute('aria-pressed', String(on));
+  botao.textContent = on ? 'Ver planta 2D' : 'Ver em 3D';
+  $('#iso-reset').hidden = !on;
+  $('#iso').hidden = !on;
+  els.indoorCanvas.hidden = on;
+  if (on) {
+    iso.resize();
+    updateEstoqueView();
+  } else {
+    indoor?.resize();
+  }
+}
+
 function bindEvents() {
   els.search.addEventListener('input', () => {
     state.query = els.search.value;
@@ -946,6 +1016,8 @@ function bindEvents() {
     selectCd(id);
   });
   $('#sair').addEventListener('click', logout);
+  $('#modo-3d').addEventListener('click', () => setModo3d(!state.modo3d));
+  $('#iso-reset').addEventListener('click', () => iso?.resetView());
   for (const b of document.querySelectorAll('[data-demo-tipo]')) {
     b.addEventListener('click', () => demoIncluir(b.dataset.demoTipo));
   }
@@ -1054,6 +1126,14 @@ async function boot() {
   Promise.all(comPlanta.map((c) => loadEstoque(c.id))).then(refreshUi);
   if (comPlanta.length) showSpace(comPlanta[0].id);
   else els.views.find((b) => b.dataset.view === 'indoor').disabled = true;
+  // Reabre a vista 3D se foi a última escolha.
+  let gosta3d = false;
+  try {
+    gosta3d = localStorage.getItem('frotalogia.3d') === '1';
+  } catch {
+    /* sem armazenamento */
+  }
+  if (gosta3d && comPlanta.length) setModo3d(true);
 
   connect({
     chave: state.chave,

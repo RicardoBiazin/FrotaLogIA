@@ -6,6 +6,7 @@ import {
 } from '../public/js/estoque.js';
 import { normalizeEstoque, EstoqueStore } from '../server/estoque.js';
 import { normalizeCentro } from '../server/centros.js';
+import { familiaDe, FAMILIAS } from '../public/js/isoView.js';
 
 const DIA = 86_400_000;
 const NOW = Date.parse('2026-10-06T12:00:00Z');
@@ -96,4 +97,12 @@ test('store: separa clientes, mantém a data de entrada do mesmo palete e emite 
   assert.equal(s.remove('c1', 'cd', 'A-01-2'), false);
   assert.deepEqual(s.search('c1', 'arroz').map((i) => i.endereco), ['A-01-1']);
   assert.deepEqual(eventos, ['c1:A-01-1', 'c1:A-01-1', 'c2:A-01-1', 'c1:A-01-2', 'c1:A-01-2:x']);
+});
+
+test('vista 3D: cor do palete pela família do produto (prefixo do SKU)', () => {
+  assert.equal(familiaDe('BEB-3001').nome, 'Bebidas');
+  assert.equal(familiaDe('ele-1001').nome, 'Eletro');
+  assert.equal(familiaDe('XYZ-1').nome, 'Outros');
+  assert.equal(familiaDe(undefined).nome, 'Outros');
+  assert.equal(new Set(FAMILIAS.map((f) => f.cor)).size, FAMILIAS.length); // cores distintas
 });

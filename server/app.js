@@ -230,6 +230,8 @@ export function createApp({ config, store, viagens, eventos, estoque, ingest, te
     '/vendor/maplibre-gl',
     express.static(path.join(ROOT, 'node_modules', 'maplibre-gl', 'dist')),
   );
+  // Three.js (vista 3D do CD): build em módulos ES; three.module.js importa ./three.core.js.
+  app.use('/vendor/three', express.static(path.join(ROOT, 'node_modules', 'three', 'build')));
   app.use(express.static(path.join(ROOT, 'public')));
   return app;
 }

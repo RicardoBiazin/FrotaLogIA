@@ -19,7 +19,7 @@ Usuário final: operadores de logística/frota.
 ```bash
 npm install
 npm run dev     # node --watch server/index.js  → http://localhost:3000
-npm test        # node --test (79 testes; devem passar sempre)
+npm test        # node --test (81 testes; devem passar sempre)
 npm run dados-teste [-- CHAVE]   # manda veículo, viagem e palete de teste pela API e confere
 npm run licencas  # regenera THIRD_PARTY_NOTICES.md e barra licença copyleft
 npm run cliente -- <id> "<nome>" [--demo]   # cria cliente em data/clientes.json e mostra a chave uma vez
@@ -72,6 +72,7 @@ fonte (HTTP / adaptador / simulador)
 ## Frontend
 
 - `public/js/interp.js`, `public/js/logistica.js` e `public/js/estoque.js` são **código puro** (sem DOM), testados em `test/interp.test.js` e `test/logistica.test.js`. Regra nova de tela (resumo de CD, busca, formatação) vai para `logistica.js`, com teste.
+- **Vista 3D** (`public/js/isoView.js`): Three.js com câmera ortográfica isométrica e controles próprios (sem os addons do Three, que importam `'three'` por nome e exigiriam import map inline, barrado pela CSP). O Three.js é servido de `node_modules/three/build` em `/vendor/three/` e carregado por `import()` só ao abrir o 3D. Cena: X = leste, Z = sul (= -y da planta), Y = altura; rumo vira `rotation.y = -rumo`. Paletes são `InstancedMesh` reconstruídos quando o estoque, a busca ou a seleção mudam; caixas invisíveis por posição tornam clicável também a posição vazia.
 - Na planta, cada prateleira é desenhada por posição, com a cor pelos níveis ocupados (`OCUPACAO_FILL` em `indoorView.js`); a busca acende as posições em amarelo. Clique: veículo bem em cima ganha, senão a posição da prateleira.
 - Na planta, os veículos de rua no pátio do CD aparecem encostados nas docas (`portas`, na ordem do id); os que sobram viram uma linha "Aguardando doca".
 - Animação: cada `AnimatedAsset` desliza da pose exibida até a nova durante o intervalo típico entre atualizações (calculado pela diferença de `ts`), e projeta por velocidade/rumo por até 3 s se a atualização atrasar. Lacuna > 60 s salta direto.
@@ -102,7 +103,7 @@ fonte (HTTP / adaptador / simulador)
 
 ## Roadmap (em ordem de prioridade)
 
-Na v0.5.0: atrasos no mapa, na lista e no card; inclusão de veículos na demonstração. Feito na v0.3.0: cerca circular dos CDs com eventos (`GET /api/eventos`, WS `evento`) e autenticação por cliente na leitura e na escrita. Na v0.4.0: estoque endereçado nas prateleiras (rua-posição-nível), com busca de produto.
+Na v0.6.0: CD em 3D isométrico. Na v0.5.0: atrasos no mapa, na lista e no card; inclusão de veículos na demonstração. Feito na v0.3.0: cerca circular dos CDs com eventos (`GET /api/eventos`, WS `evento`) e autenticação por cliente na leitura e na escrita. Na v0.4.0: estoque endereçado nas prateleiras (rua-posição-nível), com busca de produto.
 
 1. **Persistência e cadastro.** Banco (PostgreSQL/PostGIS) para clientes, CDs, viagens e eventos; tela de cadastro de CDs e de clientes no lugar do `data/clientes.json`. Hoje reiniciar apaga tudo.
 2. **Usuários por cliente.** Hoje é uma chave por empresa; o próximo passo é usuário/senha (ou SSO) com papéis (operador, gestor) e registro de quem consultou o quê (LGPD).

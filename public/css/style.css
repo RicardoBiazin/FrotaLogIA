@@ -436,6 +436,27 @@ button, input { font: inherit; color: inherit; }
 .action:hover { filter: brightness(1.1); }
 .secondary-action { background: var(--chalk); color: var(--ink); border: 1px solid var(--line); }
 
+.stage-tools { position: absolute; top: 14px; left: 14px; z-index: 3; display: flex; flex-wrap: wrap; gap: 8px; }
+.stage-tools .pill { position: static; }
+#modo-3d[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+#iso { position: absolute; inset: 0; }
+#iso canvas { display: block; cursor: grab; touch-action: none; }
+#iso canvas:active { cursor: grabbing; }
+.iso-legenda {
+  position: absolute; left: 14px; bottom: 14px; z-index: 2;
+  max-width: min(420px, calc(100% - 28px));
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+  color: var(--ink-2);
+  pointer-events: none;
+}
+.iso-legenda ul { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 4px; padding: 0; list-style: none; color: var(--ink); }
+.iso-legenda li { display: inline-flex; align-items: center; gap: 5px; }
+.iso-legenda i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.iso-legenda p { margin: 0; }
 .picker { padding: 4px 6px; }
 .picker select { border: 0; background: transparent; font-weight: 600; padding: 4px; cursor: pointer; }
 

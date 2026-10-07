@@ -236,6 +236,14 @@ test('viagem guarda a estimativa e recusa estimativa inválida', async () => {
   assert.match((await bad.json()).rejected[0].erro, /estimativa/);
 });
 
+test('serve o Three.js da vista 3D (módulo e o núcleo que ele importa)', async () => {
+  for (const f of ['three.module.js', 'three.core.js']) {
+    const res = await fetch(`${base}/vendor/three/${f}`);
+    assert.equal(res.status, 200, f);
+    assert.match(res.headers.get('content-type'), /javascript/);
+  }
+});
+
 test('JSON inválido responde 400', async () => {
   const res = await post('/api/positions', '{quebrado', A);
   assert.equal(res.status, 400);

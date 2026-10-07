@@ -89,13 +89,23 @@
       <div id="map" aria-label="Mapa da frota"></div>
       <div id="indoor" hidden>
         <canvas id="indoor-canvas" aria-label="Planta do centro de distribuição"></canvas>
+        <div id="iso" hidden>
+          <div class="iso-legenda" aria-label="Legenda">
+            <ul id="iso-familias"></ul>
+            <p>Arraste para girar · roda do mouse para aproximar · botão direito (ou Shift) para mover</p>
+          </div>
+        </div>
       </div>
 
       <button id="fit" class="pill" type="button">Enquadrar frota</button>
-      <label id="cd-picker" class="pill picker" hidden>
-        <span class="sr-only">Centro de distribuição</span>
-        <select id="cd-select"></select>
-      </label>
+      <div id="cd-picker" class="stage-tools" hidden>
+        <label class="pill picker">
+          <span class="sr-only">Centro de distribuição</span>
+          <select id="cd-select"></select>
+        </label>
+        <button id="modo-3d" class="pill" type="button" aria-pressed="false">Ver em 3D</button>
+        <button id="iso-reset" class="pill" type="button" hidden>Centralizar</button>
+      </div>
 
       <!-- Veículo / equipamento -->
       <section id="detail" class="detail" aria-live="off" hidden>
