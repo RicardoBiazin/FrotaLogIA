@@ -4,6 +4,7 @@ import { AssetStore } from './store.js';
 import { ViagemStore } from './viagens.js';
 import { EventLog } from './eventos.js';
 import { EstoqueStore } from './estoque.js';
+import { CentrosCadastro } from './cadastro.js';
 import { loadTenants } from './tenants.js';
 import { createIngest } from './ingest.js';
 import { createApp } from './app.js';
@@ -21,6 +22,15 @@ try {
   process.exit(1);
 }
 
+// CDs cadastrados pela tela (data/centros/<cliente>.json) somam-se aos da configuração.
+const cadastro = new CentrosCadastro({ dir: config.centrosDir, tenants });
+try {
+  cadastro.load();
+} catch (err) {
+  console.error(`Não foi possível carregar os CDs cadastrados: ${err.message}`);
+  process.exit(1);
+}
+
 const store = new AssetStore({
   offlineAfterMs: config.offlineAfterMs,
   trailMax: config.trailMax,
@@ -32,9 +42,14 @@ const estoque = new EstoqueStore();
 const ingest = createIngest({ store, viagens, eventos, estoque, tenants });
 // cliente: definido na partida; sim: preenchido quando o simulador terminar de subir (rotas do OSRM)
 const demo = { cliente: null, sim: null };
-const app = createApp({ config, store, viagens, eventos, estoque, ingest, tenants, demo, version: VERSION });
+const app = createApp({ config, store, viagens, eventos, estoque, ingest, tenants, cadastro, demo, version: VERSION });
+// CD alterado ou excluído: paletes em endereços que deixaram de existir saem do estoque.
+cadastro.on('change', (cliente, ev) => {
+  if (ev.tipo === 'removido') estoque.limparCd(cliente, ev.id, null);
+  else if (ev.tipo === 'atualizado') estoque.limparCd(cliente, ev.centro.id, ev.centro.planta);
+});
 const server = http.createServer(app);
-const hub = createHub({ server, store, viagens, eventos, estoque, tenants, batchMs: config.batchMs });
+const hub = createHub({ server, store, viagens, eventos, estoque, tenants, cadastro, batchMs: config.batchMs });
 
 const sweepTimer = setInterval(() => store.sweep(), 5_000);
 let simulation = null;

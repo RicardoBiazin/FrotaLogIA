@@ -19,7 +19,7 @@ Usuário final: operadores de logística/frota.
 ```bash
 npm install
 npm run dev     # node --watch server/index.js  → http://localhost:3000
-npm test        # node --test (81 testes; devem passar sempre)
+npm test        # node --test (89 testes; devem passar sempre)
 npm run dados-teste [-- CHAVE]   # manda veículo, viagem e palete de teste pela API e confere
 npm run licencas  # regenera THIRD_PARTY_NOTICES.md e barra licença copyleft
 npm run cliente -- <id> "<nome>" [--demo]   # cria cliente em data/clientes.json e mostra a chave uma vez
@@ -65,6 +65,7 @@ fonte (HTTP / adaptador / simulador)
 - **Estoque** (`server/estoque.js` + `public/js/estoque.js`): endereço `RUA-POSIÇÃO-NÍVEL` (`A-03-2`), uma posição-palete por endereço, `quantidade: 0` libera. Prateleira da planta = rua, com `id`, `posicoes` (ao longo do lado maior) e `niveis` (1 = chão). A validação de endereço mora em `public/js/estoque.js` e é importada pelo servidor: uma regra só para os dois lados. O estoque completo vem por `GET /api/centros/:cd/estoque`; o WS manda só as posições alteradas no `batch` (`removido: true` = liberada).
 - **Atraso** (`atrasoMs` em `public/js/logistica.js`): `previsao` é o prazo combinado e **não** é recalculado; `estimativa` é a chegada prevista atualizada. Atrasada = `max(agora, estimativa) - previsao >= 1 min`, só em `planejada | carregando | em_transito`. O simulador fixa o prazo na saída e refaz só a estimativa; quem recalcular `previsao` no caminho apaga todos os atrasos.
 - **Demonstração** (`POST/DELETE /api/demo/veiculos`): só para o cliente do simulador (`demo.sim.cliente`), até `MAX_EXTRAS` (100) veículos incluídos, que nascem pelo mesmo `spawn` dos fixos (`server/sim/index.js`).
+- **Cadastro de CD** (`server/cadastro.js` + `public/js/planta.js`): o CD criado pela tela guarda só as medidas (`galpao`); a planta é sempre gerada por `gerarPlanta` (mesma função na pré-visualização e no servidor). Gravado em `data/centros/<cliente>.json` com troca atômica (tmp + rename). Os CDs entram na **mesma lista** `tenant.centros` usada pela cerca (alterada no lugar). Editar/excluir só vale para `cadastrado: true`; os da configuração respondem 409. Mudança avisa os navegadores (`{ type: 'centros' }`) e limpa do estoque os endereços que sumiram (`estoque.limparCd`).
 - **Viagem** (`server/viagens.js`): `status` em `planejada | carregando | em_transito | descarregando | entregue | cancelada`; peso em kg, volume em m³, valor em R$. O navegador guarda só as ativas, indexadas por veículo (`applyViagem` em `logistica.js`).
 - Nomes de campos de domínio são em português (`tipo`, `rumo`, `velocidade`, `espaco`, `atributos`); nomes de infraestrutura em inglês.
 - Tipos válidos estão em `server/normalize.js` (`TIPOS`) e `public/js/icons.js`. Ao criar um tipo novo, atualize os dois, o desenho em `icons.js` e os testes.
@@ -103,7 +104,7 @@ fonte (HTTP / adaptador / simulador)
 
 ## Roadmap (em ordem de prioridade)
 
-Na v0.7.0: 3D em estilo maquete, indicadores e docas sobre a cena, atributos de operação da empilhadeira. Na v0.6.0: CD em 3D isométrico. Na v0.5.0: atrasos no mapa, na lista e no card; inclusão de veículos na demonstração. Feito na v0.3.0: cerca circular dos CDs com eventos (`GET /api/eventos`, WS `evento`) e autenticação por cliente na leitura e na escrita. Na v0.4.0: estoque endereçado nas prateleiras (rua-posição-nível), com busca de produto.
+Na v0.8.0: cadastro de CD pela tela. Na v0.7.0: 3D em estilo maquete, indicadores e docas sobre a cena, atributos de operação da empilhadeira. Na v0.6.0: CD em 3D isométrico. Na v0.5.0: atrasos no mapa, na lista e no card; inclusão de veículos na demonstração. Feito na v0.3.0: cerca circular dos CDs com eventos (`GET /api/eventos`, WS `evento`) e autenticação por cliente na leitura e na escrita. Na v0.4.0: estoque endereçado nas prateleiras (rua-posição-nível), com busca de produto.
 
 1. **Persistência e cadastro.** Banco (PostgreSQL/PostGIS) para clientes, CDs, viagens e eventos; tela de cadastro de CDs e de clientes no lugar do `data/clientes.json`. Hoje reiniciar apaga tudo.
 2. **Usuários por cliente.** Hoje é uma chave por empresa; o próximo passo é usuário/senha (ou SSO) com papéis (operador, gestor) e registro de quem consultou o quê (LGPD).

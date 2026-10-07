@@ -126,6 +126,23 @@ export class EstoqueStore extends EventEmitter {
     return existed;
   }
 
+  /**
+   * Tira do CD os paletes cujo endereço não existe mais na planta (ruas, posições ou níveis
+   * removidos numa edição). Sem planta (CD excluído), tira todos. Devolve quantos saíram.
+   */
+  limparCd(cliente, cdId, planta) {
+    const itens = this.#bucket(cliente)?.cds.get(cdId);
+    if (!itens) return 0;
+    let n = 0;
+    for (const endereco of [...itens.keys()]) {
+      if (!planta || validarEndereco(endereco, planta).error) {
+        this.remove(cliente, cdId, endereco);
+        n++;
+      }
+    }
+    return n;
+  }
+
   get(cliente, cdId, endereco) {
     return this.#bucket(cliente)?.cds.get(cdId)?.get(endereco) ?? null;
   }

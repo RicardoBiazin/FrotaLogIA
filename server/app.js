@@ -42,6 +42,8 @@ function securityHeaders(_req, res, next) {
 /** CD como o navegador precisa: a planta já vem no formato da IndoorView. */
 const publicCentro = (c) => ({
   id: c.id,
+  cadastrado: Boolean(c.cadastrado), // criado pela tela: pode ser editado e excluído
+  galpao: c.galpao ?? null, // medidas usadas para gerar a planta (só nos cadastrados)
   nome: c.nome,
   endereco: c.endereco,
   lat: c.lat,
@@ -54,7 +56,10 @@ const publicCentro = (c) => ({
  * @param demo { cliente, sim } — cliente que o simulador alimenta (conhecido logo na partida) e o
  *             simulador em execução (null enquanto ele sobe). Só esse cliente inclui/remove veículos.
  */
-export function createApp({ config, store, viagens, eventos, estoque, ingest, tenants, demo = { cliente: null, sim: null }, version = null }) {
+export function createApp({
+  config, store, viagens, eventos, estoque, ingest, tenants, cadastro = null,
+  demo = { cliente: null, sim: null }, version = null,
+}) {
   const app = express();
   app.disable('x-powered-by');
   app.use(securityHeaders);
@@ -131,6 +136,24 @@ export function createApp({ config, store, viagens, eventos, estoque, ingest, te
   });
 
   api.get('/centros', (req, res) => res.json(req.tenant.centros.map(publicCentro)));
+
+  // Cadastro de CD pela tela. Os CDs da configuração ficam de fora (409).
+  const responder = (res, r, ok = 200) => {
+    if (r.error) return res.status(r.status ?? 400).json({ erro: r.error });
+    res.status(ok).json(r.centro ? publicCentro(r.centro) : { ok: true });
+  };
+  api.post('/centros', (req, res) => {
+    if (!cadastro) return res.status(501).json({ erro: 'cadastro de CD indisponível' });
+    responder(res, cadastro.criar(req.cliente, req.body), 201);
+  });
+  api.put('/centros/:id', (req, res) => {
+    if (!cadastro) return res.status(501).json({ erro: 'cadastro de CD indisponível' });
+    responder(res, cadastro.atualizar(req.cliente, req.params.id, req.body));
+  });
+  api.delete('/centros/:id', (req, res) => {
+    if (!cadastro) return res.status(501).json({ erro: 'cadastro de CD indisponível' });
+    responder(res, cadastro.remover(req.cliente, req.params.id));
+  });
 
   // Estoque endereçado de um CD (posições ocupadas) e busca de produto em todos os CDs.
   api.get('/centros/:cd/estoque', (req, res) => {

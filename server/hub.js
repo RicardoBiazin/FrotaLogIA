@@ -10,6 +10,7 @@
 //      O estoque completo de um CD vem por GET /api/centros/:cd/estoque.)
 //   { type: 'remove',   id }
 //   { type: 'evento',   evento }
+//   { type: 'centros' }  (CD criado, alterado ou excluído: recarregue GET /api/centros)
 // Chave inválida: a conexão é fechada com o código 4401.
 //
 // Evolução natural: filtrar por área visível (cliente envia { type: 'viewport', bbox }).
@@ -19,7 +20,7 @@ import { publicAsset } from './store.js';
 export const WS_UNAUTHORIZED = 4401;
 const AUTH_TIMEOUT_MS = 10_000;
 
-export function createHub({ server, store, viagens, eventos, estoque, tenants, batchMs = 250 }) {
+export function createHub({ server, store, viagens, eventos, estoque, tenants, cadastro = null, batchMs = 250 }) {
   const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 16 * 1024 });
   // O ws repete aqui os erros do servidor HTTP (ex.: porta ocupada); quem os trata é o index.js.
   wss.on('error', () => {});
@@ -94,6 +95,8 @@ export function createHub({ server, store, viagens, eventos, estoque, tenants, b
   viagens.on('update', onViagem);
   eventos.on('evento', onEvento);
   estoque.on('update', onEstoque);
+  const onCentros = (cliente) => broadcast(cliente, { type: 'centros' });
+  cadastro?.on('change', onCentros);
 
   const flushTimer = setInterval(() => {
     for (const [cliente, p] of pending) {
@@ -132,6 +135,7 @@ export function createHub({ server, store, viagens, eventos, estoque, tenants, b
       viagens.off('update', onViagem);
       eventos.off('evento', onEvento);
       estoque.off('update', onEstoque);
+      cadastro?.off('change', onCentros);
       for (const ws of wss.clients) ws.terminate();
       wss.close();
     },

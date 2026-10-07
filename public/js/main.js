@@ -12,6 +12,7 @@ import {
   ocupacaoPorPosicao, itensDaPosicao, resumoEstoque, matchesItem, situacaoValidade, diasAte,
   posicaoKey, parseEndereco,
 } from './estoque.js';
+import { GALPAO_PADRAO, validarGalpao, gerarPlanta, capacidadeGalpao, resumoGalpao } from './planta.js';
 
 const $ = (selector) => document.querySelector(selector);
 const els = {
@@ -664,6 +665,8 @@ function updateCdDetail() {
     $('#cd-vencendo').title = `${r.vencendo} vencem em até 30 dias, ${r.vencidos} vencidos`;
   }
   $('#cd-planta').hidden = !cd.planta || (state.view === 'indoor' && state.space?.id === cd.id);
+  $('#cd-editar').hidden = !cd.cadastrado;
+  $('#cd-excluir').hidden = !cd.cadastrado;
   $('#cd-mapa').hidden = state.view === 'map';
 }
 
@@ -734,7 +737,7 @@ function setView(view) {
   for (const button of els.views) button.setAttribute('aria-selected', String(button.dataset.view === view));
   els.map.hidden = view !== 'map';
   els.indoor.hidden = view !== 'indoor';
-  els.fit.hidden = view !== 'map';
+  $('#map-tools').hidden = view !== 'map';
   els.cdPicker.hidden = view !== 'indoor';
   if (view === 'map') geo?.resize();
   else {
@@ -1099,6 +1102,157 @@ async function setModo3d(on) {
   }
 }
 
+// ---------- Cadastro de CD (novo / editar / excluir) ----------
+
+const cdForm = { editando: null, preview: null, marcando: false, timer: null };
+const numero = (v) => (typeof v === 'string' ? Number(v.replace(',', '.').trim()) : Number(v));
+
+/** Recarrega a lista de CDs (cadastro feito aqui ou em outra tela, avisado pelo WebSocket). */
+async function recarregarCentros() {
+  state.centros = await api('/api/centros');
+  buildCdPicker();
+  geo?.setCentros(state.centros);
+  const comPlanta = state.centros.filter((c) => c.planta);
+  els.views.find((b) => b.dataset.view === 'indoor').disabled = comPlanta.length === 0;
+  for (const id of [...state.estoque.keys()]) if (!comPlanta.some((c) => c.id === id)) state.estoque.delete(id);
+  await Promise.all(comPlanta.map((c) => loadEstoque(c.id)));
+  const atual = state.space && centroById(state.space.id);
+  if (atual?.planta) showSpace(atual.id); // a planta pode ter mudado numa edição
+  else if (comPlanta[0]) showSpace(comPlanta[0].id);
+  else {
+    state.space = null;
+    if (state.view === 'indoor') setView('map');
+  }
+  if (state.selectedCd && !centroById(state.selectedCd)) selectCd(null);
+  if (state.selectedSlot && !centroById(state.selectedSlot.cd)) state.selectedSlot = null;
+  refreshUi();
+}
+
+function lerForm() {
+  const f = $('#cd-form').elements;
+  return {
+    nome: f.nome.value,
+    endereco: f.endereco.value,
+    lat: f.lat.value === '' ? '' : numero(f.lat.value),
+    lon: f.lon.value === '' ? '' : numero(f.lon.value),
+    raioM: f.raioM.value === '' ? '' : numero(f.raioM.value),
+    galpao: {
+      largura: numero(f.largura.value),
+      comprimento: numero(f.comprimento.value),
+      docas: numero(f.docas.value),
+      ruas: numero(f.ruas.value),
+      niveis: numero(f.niveis.value),
+      posicoes: f.posicoes.value === '' ? null : numero(f.posicoes.value),
+    },
+  };
+}
+
+/** Pré-visualização da planta e capacidade, a cada mudança nas medidas. */
+function atualizarPreview() {
+  const dados = lerForm();
+  const g = dados.galpao;
+  const cap = Number.isFinite(g.largura) && Number.isFinite(g.comprimento) ? capacidadeGalpao(g.largura, g.comprimento) : null;
+  setText('#cd-capacidade', cap
+    ? `Nestas medidas cabem até ${cap.ruas} ruas e ${cap.docas} docas; ${cap.posicoes} posições por rua no automático.`
+    : '');
+  const v = validarGalpao(g);
+  const erro = $('#cd-form-erro');
+  if (v.error) {
+    setText('#cd-resumo', '');
+    erro.textContent = v.error.charAt(0).toUpperCase() + v.error.slice(1) + '.';
+    erro.hidden = false;
+    return;
+  }
+  erro.hidden = true;
+  const r = resumoGalpao(v.galpao);
+  setText('#cd-resumo', `${fmt(r.posicoesPalete)} posições-palete (${fmt(r.porRua)} por rua) · ${fmt(r.area)} m² · ${v.galpao.docas} docas`);
+  const planta = { ...gerarPlanta(v.galpao), id: 'previa', nome: dados.nome || 'Novo CD' };
+  cdForm.preview ??= new IndoorView($('#cd-preview-wrap'), $('#cd-preview-canvas'), { onSelect: () => {} });
+  cdForm.preview.setSpace(planta);
+  requestAnimationFrame(() => cdForm.preview.render([], []));
+}
+
+function abrirFormCd(cd = null) {
+  cdForm.editando = cd;
+  const f = $('#cd-form').elements;
+  const g = cd?.galpao ?? GALPAO_PADRAO;
+  // Novo CD: começa no centro do mapa, para "Marcar no mapa" ser só um ajuste.
+  const centro = geo?.map?.getCenter?.();
+  f.nome.value = cd?.nome ?? '';
+  f.endereco.value = cd?.endereco ?? '';
+  f.lat.value = cd ? cd.lat : centro ? centro.lat.toFixed(5) : '';
+  f.lon.value = cd ? cd.lon : centro ? centro.lng.toFixed(5) : '';
+  f.raioM.value = cd?.raioM ?? 300;
+  for (const k of ['largura', 'comprimento', 'docas', 'ruas', 'niveis']) f[k].value = g[k];
+  f.posicoes.value = g.posicoes ?? '';
+  setText('#cd-form-titulo', cd ? `Editar ${cd.nome}` : 'Novo centro de distribuição');
+  setText('#cd-salvar', cd ? 'Salvar alterações' : 'Criar CD');
+  $('#cd-form-erro').hidden = true;
+  $('#cd-dialog').showModal();
+  atualizarPreview();
+  f.nome.focus();
+}
+
+function marcarNoMapa(lngLat) {
+  if (!cdForm.marcando) return false;
+  cdForm.marcando = false;
+  $('#marcar-aviso').hidden = true;
+  const f = $('#cd-form').elements;
+  f.lat.value = lngLat.lat.toFixed(5);
+  f.lon.value = lngLat.lng.toFixed(5);
+  $('#cd-dialog').showModal();
+  atualizarPreview();
+  return true;
+}
+
+function iniciarMarcacao() {
+  cdForm.marcando = true;
+  $('#cd-dialog').close();
+  setView('map');
+  $('#marcar-aviso').hidden = false;
+}
+
+function cancelarMarcacao() {
+  cdForm.marcando = false;
+  $('#marcar-aviso').hidden = true;
+  $('#cd-dialog').showModal();
+}
+
+async function salvarCd(e) {
+  e.preventDefault();
+  const erro = $('#cd-form-erro');
+  const botao = $('#cd-salvar');
+  botao.disabled = true;
+  try {
+    const dados = lerForm();
+    const cd = cdForm.editando
+      ? await apiSend('PUT', `/api/centros/${encodeURIComponent(cdForm.editando.id)}`, dados)
+      : await apiSend('POST', '/api/centros', dados);
+    $('#cd-dialog').close();
+    await recarregarCentros();
+    setView('map');
+    selectCd(cd.id);
+  } catch (err) {
+    erro.textContent = `Não foi possível salvar: ${err.message}.`;
+    erro.hidden = false;
+  } finally {
+    botao.disabled = false;
+  }
+}
+
+async function excluirCd() {
+  const cd = state.selectedCd && centroById(state.selectedCd);
+  if (!cd?.cadastrado) return;
+  if (!confirm(`Excluir o ${cd.nome}? Os paletes cadastrados nele também saem do estoque. Não dá para desfazer.`)) return;
+  try {
+    await apiSend('DELETE', `/api/centros/${encodeURIComponent(cd.id)}`);
+    selectCd(null);
+    await recarregarCentros();
+  } catch (err) {
+    alert(`Não foi possível excluir: ${err.message}`);
+  }
+}
+
 function bindEvents() {
   els.search.addEventListener('input', () => {
     state.query = els.search.value;
@@ -1147,6 +1301,17 @@ function bindEvents() {
     selectCd(id);
   });
   $('#sair').addEventListener('click', logout);
+  for (const b of document.querySelectorAll('[data-novo-cd]')) b.addEventListener('click', () => abrirFormCd());
+  $('#cd-editar').addEventListener('click', () => abrirFormCd(centroById(state.selectedCd)));
+  $('#cd-excluir').addEventListener('click', excluirCd);
+  $('#cd-form').addEventListener('submit', salvarCd);
+  $('#cd-form').addEventListener('input', () => {
+    clearTimeout(cdForm.timer);
+    cdForm.timer = setTimeout(atualizarPreview, 150);
+  });
+  for (const b of document.querySelectorAll('[data-fechar]')) b.addEventListener('click', () => $('#cd-dialog').close());
+  $('#cd-marcar').addEventListener('click', iniciarMarcacao);
+  $('#marcar-cancelar').addEventListener('click', cancelarMarcacao);
   $('#modo-3d').addEventListener('click', () => setModo3d(!state.modo3d));
   $('#iso-reset').addEventListener('click', () => iso?.resetView());
   $('#iso-docas-list').addEventListener('click', (e) => {
@@ -1171,6 +1336,7 @@ function bindEvents() {
   });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
+    if (cdForm.marcando) return cancelarMarcacao();
     if (state.selectedId) select(null);
     else if (state.selectedSlot) selectSlot(null);
     else if (state.selectedCd) selectCd(null);
@@ -1279,6 +1445,7 @@ async function boot() {
     onEvento,
     onState: onConnectionState,
     onUnauthorized: logout,
+    onCentros: () => recarregarCentros(),
   });
   requestAnimationFrame(frame);
   setInterval(refreshUi, 500);
@@ -1288,6 +1455,7 @@ async function boot() {
   geo = new GeoView(els.map, config, {
     onSelect: select,
     onSelectCd: (id) => selectCd(id),
+    onMapClick: (lngLat) => marcarNoMapa(lngLat),
     onUserPan: () => setFollow(false),
   });
   geo.setCentros(state.centros);

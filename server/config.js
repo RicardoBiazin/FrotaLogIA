@@ -29,6 +29,8 @@ export const config = {
   apiKey,
   // Clientes e suas chaves (ver server/tenants.js). Ausente = só o cliente "demo".
   clientesFile: path.resolve(ROOT, process.env.CLIENTES_FILE || 'data/clientes.json'),
+  // CDs cadastrados pela tela, um arquivo por cliente.
+  centrosDir: path.resolve(ROOT, process.env.CENTROS_DIR || 'data/centros'),
   // Cliente que recebe os dados do simulador. Vazio: "demo" ou o primeiro com a rede de exemplo.
   simCliente: process.env.SIM_CLIENTE || '',
   simulate: (process.env.SIMULATE ?? 'true').toLowerCase() !== 'false',

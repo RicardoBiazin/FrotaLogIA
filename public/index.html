@@ -109,13 +109,20 @@
         </div>
       </div>
 
-      <button id="fit" class="pill" type="button">Enquadrar frota</button>
+      <div id="map-tools" class="stage-tools">
+        <button id="fit" class="pill" type="button">Enquadrar frota</button>
+        <button class="pill novo-cd" type="button" data-novo-cd>+ Novo CD</button>
+      </div>
+      <p id="marcar-aviso" class="marcar-aviso" role="status" hidden>
+        Clique no mapa onde fica o CD. <button id="marcar-cancelar" class="link" type="button">Cancelar</button>
+      </p>
       <div id="cd-picker" class="stage-tools" hidden>
         <label class="pill picker">
           <span class="sr-only">Centro de distribuição</span>
           <select id="cd-select"></select>
         </label>
         <button id="modo-3d" class="pill" type="button" aria-pressed="false">Ver em 3D</button>
+        <button class="pill novo-cd" type="button" data-novo-cd>+ Novo CD</button>
         <button id="iso-reset" class="pill" type="button" hidden>Centralizar</button>
       </div>
 
@@ -194,6 +201,8 @@
         <div class="toggles">
           <button id="cd-planta" class="action" type="button">Abrir planta</button>
           <button id="cd-mapa" class="action secondary-action" type="button">Ver no mapa</button>
+          <button id="cd-editar" class="action secondary-action" type="button" hidden>Editar</button>
+          <button id="cd-excluir" class="link perigo" type="button" hidden>Excluir</button>
         </div>
       </section>
 
@@ -211,6 +220,58 @@
       </section>
     </main>
   </div>
+
+  <dialog id="cd-dialog" class="cd-dialog" aria-labelledby="cd-form-titulo">
+    <form id="cd-form" novalidate>
+      <header class="cd-dialog-head">
+        <h2 id="cd-form-titulo">Novo centro de distribuição</h2>
+        <button type="button" class="close" data-fechar>Fechar</button>
+      </header>
+      <div class="cd-form-grid">
+        <div class="cd-form-campos">
+          <fieldset>
+            <legend>Identificação</legend>
+            <label><span>Nome <b class="req" aria-hidden="true">*</b></span><input name="nome" required maxlength="80" placeholder="CD Joinville" autocomplete="off"></label>
+            <label>Endereço<input name="endereco" maxlength="160" placeholder="Rua, número, cidade (UF)" autocomplete="off"></label>
+          </fieldset>
+          <fieldset>
+            <legend>Localização</legend>
+            <div class="row2">
+              <label><span>Latitude <b class="req" aria-hidden="true">*</b></span><input name="lat" inputmode="decimal" placeholder="-27,5954" autocomplete="off"></label>
+              <label><span>Longitude <b class="req" aria-hidden="true">*</b></span><input name="lon" inputmode="decimal" placeholder="-48,5480" autocomplete="off"></label>
+            </div>
+            <button type="button" id="cd-marcar" class="action secondary-action">Marcar no mapa</button>
+            <label>Raio da cerca (m)<input name="raioM" type="number" min="30" max="5000" step="10" value="300"></label>
+            <p class="hint">Veículo dentro desse raio conta como "no pátio" do CD.</p>
+          </fieldset>
+          <fieldset>
+            <legend>Galpão</legend>
+            <div class="row2">
+              <label>Largura (m)<input name="largura" type="number" min="20" max="500" step="1"></label>
+              <label>Comprimento (m)<input name="comprimento" type="number" min="30" max="500" step="1"></label>
+            </div>
+            <div class="row3">
+              <label>Docas<input name="docas" type="number" min="0" max="40" step="1"></label>
+              <label>Ruas<input name="ruas" type="number" min="0" max="26" step="1"></label>
+              <label>Níveis<input name="niveis" type="number" min="1" max="10" step="1"></label>
+            </div>
+            <label>Posições por rua<input name="posicoes" type="number" min="1" max="200" step="1" placeholder="automático"></label>
+            <p class="hint" id="cd-capacidade"></p>
+          </fieldset>
+        </div>
+        <div class="cd-preview">
+          <p class="sub">Planta gerada</p>
+          <div id="cd-preview-wrap"><canvas id="cd-preview-canvas" aria-label="Pré-visualização da planta"></canvas></div>
+          <p id="cd-resumo" class="hint"></p>
+        </div>
+      </div>
+      <p id="cd-form-erro" class="erro" role="alert" hidden></p>
+      <footer class="cd-dialog-foot">
+        <button type="button" class="action secondary-action" data-fechar>Cancelar</button>
+        <button type="submit" class="action" id="cd-salvar">Criar CD</button>
+      </footer>
+    </form>
+  </dialog>
 
   <div id="login" class="login" hidden>
     <form id="login-form" class="login-card">

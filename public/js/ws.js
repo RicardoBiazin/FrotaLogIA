@@ -2,7 +2,7 @@
 // A primeira mensagem é { type: 'auth', chave }; chave recusada (código 4401) não reconecta.
 const WS_UNAUTHORIZED = 4401;
 
-export function connect({ chave, onSnapshot, onBatch, onRemove, onEvento, onState, onUnauthorized }) {
+export function connect({ chave, onSnapshot, onBatch, onRemove, onEvento, onCentros, onState, onUnauthorized }) {
   const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
   let socket = null;
   let attempt = 0;
@@ -29,6 +29,7 @@ export function connect({ chave, onSnapshot, onBatch, onRemove, onEvento, onStat
       } else if (message.type === 'batch') onBatch(message);
       else if (message.type === 'remove') onRemove(message.id);
       else if (message.type === 'evento') onEvento(message.evento);
+      else if (message.type === 'centros') onCentros?.();
     };
     socket.onclose = (event) => {
       if (closed) return;

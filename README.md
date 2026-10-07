@@ -8,6 +8,7 @@ Logística de transporte em tempo real, **por cliente**: cada empresa vê a pró
 - **Centros de distribuição:** clique num CD para ver o pátio, as chegadas previstas e as últimas entradas e saídas. "Abrir planta" mostra o interior, com as empilhadeiras em tempo real e os caminhões encostados nas docas.
 - **CD em 3D:** na aba Centros, "Ver em 3D" mostra o CD como uma maquete isométrica: prédio em corte (as paredes viradas para você ficam baixas, de qualquer ângulo), prateleiras com caixas em cada nível (etiqueta na cor da família do produto), empilhadeiras se movendo em tempo real (com o palete nos garfos quando carregadas), caminhões de ré nas docas com a porta aberta, pátio com vagas e sombras. Sobre a cena ficam os indicadores do CD (paletes em estoque, veículos no pátio, entregas no prazo) e a ocupação das docas. A busca põe marcadores sobre as posições encontradas. Arraste para girar, use a roda para aproximar e o botão direito (ou Shift) para mover.
 - **Prateleiras e estoque:** na planta, cada prateleira aparece dividida em posições, coloridas pelos níveis ocupados. Clique numa posição para ver o que há em cada nível: produto, SKU, depositante, quantidade, peso, lote, data de entrada e validade, com aviso de vencido ou vencendo. Busque um produto, SKU ou lote para ver em que endereço e em que CD ele está; as posições acendem na planta.
+- **Cadastro de CD:** "+ Novo CD" (no mapa ou na aba Centros) abre um formulário com nome, endereço, localização (digitada ou marcada com um clique no mapa), raio da cerca e as medidas do galpão: largura, comprimento, docas, ruas de prateleira, níveis e posições por rua. A planta é gerada sozinha (docas ao sul, expedição, armazenagem, picking) e aparece numa pré-visualização enquanto você digita. Os CDs cadastrados ficam em `data/centros/<cliente>.json` e podem ser editados e excluídos pelo card do CD.
 - **Movimentação:** entradas e saídas dos CDs são detectadas sozinhas, por uma cerca virtual em volta de cada CD.
 - **Multi-cliente:** cada empresa entra com a própria chave de acesso e só enxerga a própria frota, tanto na API quanto no WebSocket.
 - **Simulador** com uma rede de exemplo na Grande Florianópolis: 4 CDs, 8 veículos com viagens, 5 empilhadeiras e cerca de 250 paletes nas prateleiras, com separação, recebimento e expedição acontecendo. Congestionamentos ocasionais fazem algumas entregas atrasar.
@@ -144,7 +145,9 @@ Tudo, exceto `/api/config` e `/api/health`, exige o header `x-api-key` com a cha
 | `GET /api/assets/:id` | Um ativo, com a viagem ativa. `/:id/trail` devolve o rastro recente. |
 | `DELETE /api/assets/:id` | Remove um ativo. |
 | `GET /api/viagens?status=&veiculo=&ativas=true` e `/api/viagens/:id` | Viagens do cliente. |
-| `GET /api/centros` | CDs do cliente, com a planta. |
+| `GET /api/centros` | CDs do cliente, com a planta. `cadastrado: true` marca os criados pela tela. |
+| `POST /api/centros` | Cria um CD: `{ nome, endereco?, lat, lon, raioM?, galpao: { largura, comprimento, docas, ruas, niveis, posicoes? } }`. A planta é gerada das medidas. |
+| `PUT /api/centros/:id` e `DELETE /api/centros/:id` | Altera ou exclui um CD cadastrado pela tela (os da configuração respondem 409). Endereços que deixam de existir saem do estoque. |
 | `POST /api/estoque` | Paletes nos endereços: um objeto ou uma lista (até 1000). `quantidade: 0` libera o endereço. |
 | `GET /api/centros/:cd/estoque` | Todas as posições ocupadas de um CD. |
 | `GET /api/estoque?q=&cd=` | Onde está o produto: busca por SKU, descrição, depositante, lote ou endereço em todos os CDs. |
@@ -197,6 +200,7 @@ Copie `.env.example` para `.env`. Todas as variáveis são opcionais.
 | `PORT` | `3000` | Porta HTTP e WebSocket. |
 | `HOST` | automático | `127.0.0.1` no modo aberto e `0.0.0.0` quando há chave. |
 | `CLIENTES_FILE` | `data/clientes.json` | Clientes, chaves (hash) e CDs. |
+| `CENTROS_DIR` | `data/centros` | CDs cadastrados pela tela, um arquivo por cliente. |
 | `API_KEY` | vazio | Sem `clientes.json`, é a chave do cliente demo. Vazio = acesso aberto (só desenvolvimento). |
 | `SIMULATE` | `true` | Liga o simulador. Desligue ao usar dados reais. |
 | `SIM_CLIENTE` | automático | Cliente que recebe os dados simulados. Vazio: o `demo` ou, sem ele, o primeiro cliente criado com `--demo`. |
@@ -219,6 +223,7 @@ server/
   tenants.js      clientes e chaves de acesso
   centros.js      CDs, cerca virtual e planta (ruas, posições e níveis)
   estoque.js      paletes nos endereços das prateleiras
+  cadastro.js     CDs criados pela tela (gravados em data/centros)
   viagens.js      viagens (dados do transporte)
   eventos.js      entradas e saídas de CD
   normalize.js    validação das posições
@@ -232,10 +237,11 @@ public/
   js/main.js        orquestra acesso, dados, animação e interface
   js/logistica.js   resumo de CD, busca e formatação (código puro, testado)
   js/estoque.js     endereços, ocupação e validade (código puro, também usado pelo servidor)
+  js/planta.js      planta gerada das medidas do galpão (código puro, também usado pelo servidor)
   js/interp.js      interpolação do movimento (código puro, testado)
   js/geoView.js     mapa (MapLibre)    js/indoorView.js  planta do CD (canvas)
   js/isoView.js     CD em 3D isométrico (Three.js, carregado só quando aberto)
-test/             81 testes (node --test)
+test/             89 testes (node --test)
 scripts/          novo-cliente.js, dados-teste.js, fake-device.js, licencas.js
 FrotaLogIA.bat    menu do Windows: instala, testa, inicia, cria cliente
 ```

@@ -202,6 +202,8 @@ export class GeoView {
       map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''));
     }
     map.on('click', (e) => {
+      // Modo "marcar no mapa" (cadastro de CD): o clique só informa a posição.
+      if (this.handlers.onMapClick?.(e.lngLat)) return;
       // Veículo tem prioridade sobre o CD (ele costuma estar dentro da cerca).
       const asset = map.queryRenderedFeatures(e.point, { layers: ['assets-icon'] })[0];
       if (asset) return this.handlers.onSelect(asset.properties.id);
