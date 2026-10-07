@@ -6,7 +6,7 @@ Logística de transporte em tempo real, **por cliente**: cada empresa vê a pró
 - **Dados do transporte:** ao clicar num veículo, o card mostra a viagem. Ela traz origem e destino, carga, peso, volume, quantidade de volumes, valor, remetente, destinatário, documento (CT-e), prazo de entrega e chegada estimada.
 - **Atrasos:** caminhões e carros fora do prazo ganham um anel vermelho no mapa com o tempo de atraso ("+12 min") e o aviso "Atrasado 12 min" na lista. O contador "veículos em atraso" no resumo mostra só os atrasados.
 - **Centros de distribuição:** clique num CD para ver o pátio, as chegadas previstas e as últimas entradas e saídas. "Abrir planta" mostra o interior, com as empilhadeiras em tempo real e os caminhões encostados nas docas.
-- **CD em 3D:** na aba Centros, "Ver em 3D" mostra o CD em vista isométrica, com as prateleiras e os paletes em cada nível (cor pela família do produto), as empilhadeiras se movendo em tempo real e os caminhões encostados nas docas. Arraste para girar, use a roda do mouse para aproximar e o botão direito (ou Shift) para mover. Clicar num palete ou numa empilhadeira abre o mesmo card da planta, e a busca acende os paletes encontrados.
+- **CD em 3D:** na aba Centros, "Ver em 3D" mostra o CD como uma maquete isométrica: prédio em corte (as paredes viradas para você ficam baixas, de qualquer ângulo), prateleiras com caixas em cada nível (etiqueta na cor da família do produto), empilhadeiras se movendo em tempo real (com o palete nos garfos quando carregadas), caminhões de ré nas docas com a porta aberta, pátio com vagas e sombras. Sobre a cena ficam os indicadores do CD (paletes em estoque, veículos no pátio, entregas no prazo) e a ocupação das docas. A busca põe marcadores sobre as posições encontradas. Arraste para girar, use a roda para aproximar e o botão direito (ou Shift) para mover.
 - **Prateleiras e estoque:** na planta, cada prateleira aparece dividida em posições, coloridas pelos níveis ocupados. Clique numa posição para ver o que há em cada nível: produto, SKU, depositante, quantidade, peso, lote, data de entrada e validade, com aviso de vencido ou vencendo. Busque um produto, SKU ou lote para ver em que endereço e em que CD ele está; as posições acendem na planta.
 - **Movimentação:** entradas e saídas dos CDs são detectadas sozinhas, por uma cerca virtual em volta de cada CD.
 - **Multi-cliente:** cada empresa entra com a própria chave de acesso e só enxerga a própria frota, tanto na API quanto no WebSocket.
@@ -97,7 +97,7 @@ Dentro de um CD (planta, sem GPS), `espaco` é o id do CD e `x`/`y` vêm em metr
 | `rumo` | Graus, 0 = norte. Opcional: se faltar, o servidor deriva da trajetória. |
 | `velocidade` | km/h. A partir de 2 km/h conta como "em movimento". |
 | `timestamp` (ou `ts`) | ISO 8601 ou epoch em ms ou em segundos. Posições mais antigas que a última recebida são ignoradas. |
-| `atributos` | Objeto livre, até 2 KB (placa, motorista...). |
+| `atributos` | Objeto livre, até 2 KB, mostrado no card do ativo. Nomes reconhecidos: `bateria` (%, com barra), `operador`, `motorista`, `carga` (o que está carregando; vazio = "Vazia"), `movimentosHoje`, `placa`, `carregador`. Na empilhadeira, `carga` preenchida desenha o palete nos garfos no 3D. |
 
 ### Viagem (dados do transporte)
 

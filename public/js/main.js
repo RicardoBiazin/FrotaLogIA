@@ -211,6 +211,7 @@ function visibleItems(now, view = state.view) {
     items.push({
       id: d.id, nome: d.nome, tipo: d.tipo, status: d.status, x: p.x, y: p.y, rumo: p.rumo,
       atrasoTxt: atraso ? `+${formatDuracao(atraso)}` : '',
+      carregado: Boolean(d.atributos?.carga),
     });
   }
   return items;
@@ -419,6 +420,109 @@ function setText(selector, value) {
   $(selector).textContent = value;
 }
 
+// Atributos livres do ativo (telemetria): rótulos conhecidos em português; os demais, como vieram.
+const ATRIBUTO_LABEL = {
+  bateria: 'Bateria',
+  operador: 'Operador',
+  motorista: 'Motorista',
+  carga: 'Carregando',
+  movimentosHoje: 'Movimentos hoje',
+  placa: 'Placa',
+  carregador: 'Carregador',
+};
+
+function renderAtributos(atributos) {
+  const dl = $('#detail-attrs');
+  const entradas = Object.entries(atributos ?? {}).filter(([, v]) => v === null || ['string', 'number', 'boolean'].includes(typeof v));
+  dl.hidden = entradas.length === 0;
+  const signature = JSON.stringify(entradas);
+  if (dl.dataset.sig === signature) return;
+  dl.dataset.sig = signature;
+  dl.replaceChildren(
+    ...entradas.slice(0, 12).map(([k, v]) => {
+      const div = document.createElement('div');
+      const dt = document.createElement('dt');
+      dt.textContent = ATRIBUTO_LABEL[k] ?? k;
+      const dd = document.createElement('dd');
+      if (k === 'bateria' && typeof v === 'number') {
+        const pct = Math.max(0, Math.min(100, Math.round(v)));
+        dd.className = 'bateria';
+        dd.dataset.nivel = pct < 25 ? 'baixa' : pct < 50 ? 'media' : 'ok';
+        const barra = document.createElement('span');
+        barra.className = 'barra';
+        const fill = document.createElement('i');
+        fill.style.width = `${pct}%`;
+        barra.append(fill);
+        dd.append(`${pct}%`, barra);
+      } else if (k === 'carga') {
+        dd.textContent = v ? String(v) : 'Vazia';
+      } else {
+        dd.textContent = v === null ? '—' : String(v);
+      }
+      div.append(dt, dd);
+      if (k === 'carga' || k === 'operador') div.className = 'wide';
+      return div;
+    }),
+  );
+}
+
+/** Painéis sobre a vista 3D: indicadores do CD e ocupação das docas. */
+function updateIsoPaineis() {
+  if (!state.modo3d || !state.space) return;
+  const cd = centroById(state.space.id);
+  const now = Date.now();
+  const itens = [...(state.estoque.get(cd.id)?.values() ?? [])];
+  const est = resumoEstoque(itens, cd.planta, now);
+  setText('#iso-kpi-estoque', fmt(est.ocupadas));
+  setText('#iso-kpi-estoque-sub', `${est.percentual}% das posições · ${fmt(est.skus)} SKUs`);
+
+  const assets = [...state.assets.values()].map((a) => a.data);
+  const r = resumoCentro(cd.id, assets, [...state.viagens.values()]);
+  setText('#iso-kpi-patio', fmt(r.patio.length));
+  setText('#iso-kpi-patio-sub', r.chegando.length ? `+${r.chegando.length} a caminho` : 'nenhum a caminho');
+
+  // viagens ativas que saem deste CD ou chegam a ele
+  const doCd = [...state.viagens.values()].filter((v) => v.origem?.cd === cd.id || v.destino?.cd === cd.id);
+  const atrasadas = doCd.filter((v) => atrasoMs(v, now)).length;
+  setText('#iso-kpi-prazo', doCd.length ? `${Math.round(((doCd.length - atrasadas) / doCd.length) * 100)}%` : '—');
+  setText('#iso-kpi-prazo-sub', doCd.length ? `${atrasadas} de ${doCd.length} em atraso` : 'sem viagens ativas');
+  $('#iso-kpi-prazo').dataset.alerta = String(atrasadas > 0);
+
+  // docas: mesma ordem da planta (veículos do pátio por id, uma porta cada)
+  const portas = [...(cd.planta.portas ?? [])].sort((a, b) => a.x - b.x);
+  const docados = r.patio.slice().sort((a, b) => a.id.localeCompare(b.id));
+  setText('#iso-docas-n', `${Math.min(docados.length, portas.length)}/${portas.length}`);
+  const linhas = portas.map((p, i) => {
+    const d = docados[i];
+    const v = d && state.viagemPorVeiculo.get(d.id);
+    return { porta: p.nome, id: d?.id ?? '', nome: d?.nome ?? 'Livre', status: v ? VIAGEM_LABEL[v.status] : d ? 'no pátio' : '' };
+  });
+  const list = $('#iso-docas-list');
+  const signature = JSON.stringify(linhas);
+  if (list.dataset.sig === signature) return;
+  list.dataset.sig = signature;
+  list.replaceChildren(
+    ...linhas.map((l) => {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'doca-row';
+      b.dataset.livre = String(!l.id);
+      if (l.id) b.dataset.id = l.id;
+      const porta = document.createElement('b');
+      porta.textContent = l.porta;
+      const nome = document.createElement('span');
+      nome.textContent = l.nome;
+      const st = document.createElement('span');
+      st.className = 'muted';
+      st.textContent = l.status;
+      b.append(porta, nome, st);
+      li.append(b);
+      return li;
+    }),
+  );
+}
+
 function updateDetail() {
   const asset = state.selectedId ? state.assets.get(state.selectedId) : null;
   if (!asset) {
@@ -447,6 +551,7 @@ function updateDetail() {
     button.dataset.cd = cd;
   }
   els.followWrap.hidden = Boolean(d.espaco);
+  renderAtributos(d.atributos);
 
   const v = state.viagemPorVeiculo.get(d.id);
   $('#trip').hidden = !v;
@@ -603,6 +708,7 @@ function refreshUi() {
   updateCdDetail();
   updateSlotDetail();
   updateCdLabels();
+  updateIsoPaineis();
   syncIndoorInsets();
 }
 
@@ -963,6 +1069,7 @@ async function setModo3d(on) {
   if (on) {
     iso.resize();
     updateEstoqueView();
+    updateIsoPaineis();
   } else {
     indoor?.resize();
   }
@@ -1018,6 +1125,10 @@ function bindEvents() {
   $('#sair').addEventListener('click', logout);
   $('#modo-3d').addEventListener('click', () => setModo3d(!state.modo3d));
   $('#iso-reset').addEventListener('click', () => iso?.resetView());
+  $('#iso-docas-list').addEventListener('click', (e) => {
+    const row = e.target.closest('[data-id]');
+    if (row) select(row.dataset.id);
+  });
   for (const b of document.querySelectorAll('[data-demo-tipo]')) {
     b.addEventListener('click', () => demoIncluir(b.dataset.demoTipo));
   }

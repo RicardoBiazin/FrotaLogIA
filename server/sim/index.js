@@ -10,7 +10,7 @@
 import { Path } from '../geo.js';
 import { AGENTS, GEO_ROUTES, WAREHOUSE_PATHS } from './routes.js';
 import { fetchRoute } from './osrm.js';
-import { CARGAS, EMPRESAS, PESSOAS } from '../demo.js';
+import { CARGAS, EMPRESAS, PESSOAS, PRODUTOS } from '../demo.js';
 import { startStockSimulation } from './estoque.js';
 
 const rand = (min, max) => min + Math.random() * (max - min);
@@ -56,6 +56,22 @@ class Agent {
     this.etaAt = 0;
     this.incidente = null; // { em: metros percorridos no trecho, ms, feito }
     this.inicioTrecho = this.s;
+    // Empilhadeira: dados de operação que um telemetria real mandaria nos atributos.
+    if (def.espaco) {
+      this.operacao = { bateria: rand(45, 100), operador: pick(PESSOAS), carga: null, movimentos: Math.floor(rand(5, 40)) };
+    }
+  }
+
+  /** Empilhadeira chegou na ponta do corredor: pega ou deixa um palete; a bateria vai descendo. */
+  #operar(dt, chegou) {
+    const op = this.operacao;
+    if (!op) return;
+    op.bateria -= dt * (this.speed > 0.2 ? 0.05 : 0.01); // % por segundo
+    if (op.bateria < 18) op.bateria = 100; // troca de bateria
+    if (chegou) {
+      if (op.carga) op.movimentos++;
+      op.carga = op.carga ? null : pick(PRODUTOS).descricao;
+    }
   }
 
   /** Sorteia um congestionamento no trecho que começa agora. */
@@ -107,6 +123,8 @@ class Agent {
       }
     }
 
+    this.#operar(dt, events.includes('chegou'));
+
     if (now >= this.nextDropoutAt) {
       this.silentUntil = now + this.def.dropout.forSec * 1000;
       this.nextDropoutAt = this.silentUntil + this.def.dropout.everySec * 1000;
@@ -125,9 +143,20 @@ class Agent {
       velocidade: this.speed * 3.6,
       ts: now,
     };
-    return this.def.espaco
-      ? { ...base, espaco: this.def.espaco, x: p.a, y: p.b }
-      : { ...base, lat: p.a, lon: p.b };
+    if (!this.def.espaco) return { ...base, lat: p.a, lon: p.b };
+    const op = this.operacao;
+    return {
+      ...base,
+      espaco: this.def.espaco,
+      x: p.a,
+      y: p.b,
+      atributos: {
+        bateria: Math.round(op.bateria),
+        operador: op.operador,
+        carga: op.carga,
+        movimentosHoje: op.movimentos,
+      },
+    };
   }
 
   /** Previsão de chegada no fim do trecho atual (tempo de rua, já com a aceleração). */

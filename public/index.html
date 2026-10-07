@@ -90,6 +90,18 @@
       <div id="indoor" hidden>
         <canvas id="indoor-canvas" aria-label="Planta do centro de distribuição"></canvas>
         <div id="iso" hidden>
+          <div class="iso-kpis" aria-label="Indicadores do CD">
+            <div class="kpi-card"><span class="kpi-ico" data-ico="estoque" aria-hidden="true"></span>
+              <div><p>Paletes em estoque</p><b id="iso-kpi-estoque">—</b><small id="iso-kpi-estoque-sub"></small></div></div>
+            <div class="kpi-card"><span class="kpi-ico" data-ico="patio" aria-hidden="true"></span>
+              <div><p>Veículos no pátio</p><b id="iso-kpi-patio">—</b><small id="iso-kpi-patio-sub"></small></div></div>
+            <div class="kpi-card"><span class="kpi-ico" data-ico="prazo" aria-hidden="true"></span>
+              <div><p>Entregas no prazo</p><b id="iso-kpi-prazo">—</b><small id="iso-kpi-prazo-sub"></small></div></div>
+          </div>
+          <section class="iso-docas" aria-label="Docas">
+            <h3><span>Docas</span> <b id="iso-docas-n"></b></h3>
+            <ul id="iso-docas-list"></ul>
+          </section>
           <div class="iso-legenda" aria-label="Legenda">
             <ul id="iso-familias"></ul>
             <p>Arraste para girar · roda do mouse para aproximar · botão direito (ou Shift) para mover</p>
@@ -124,6 +136,8 @@
           <div class="secondary"><dt>Atualizado</dt><dd id="detail-age"></dd></div>
           <div class="wide" id="detail-cd-wrap"><dt>Local</dt><dd><button id="detail-cd" class="link" type="button"></button></dd></div>
           <div class="wide secondary"><dt>Posição</dt><dd id="detail-pos"></dd></div>
+        </dl>
+        <dl id="detail-attrs" class="attrs" hidden>
         </dl>
 
         <section id="trip" class="trip" aria-label="Transporte" hidden>
