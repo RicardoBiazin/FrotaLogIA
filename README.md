@@ -7,6 +7,12 @@ Logística de transporte em tempo real, **por cliente**: cada empresa vê a pró
 - **Atrasos:** caminhões e carros fora do prazo ganham um anel vermelho no mapa com o tempo de atraso ("+12 min") e o aviso "Atrasado 12 min" na lista. O contador "veículos em atraso" no resumo mostra só os atrasados.
 - **Centros de distribuição:** clique num CD para ver o pátio, as chegadas previstas e as últimas entradas e saídas. "Abrir planta" mostra o interior, com as empilhadeiras em tempo real e os caminhões encostados nas docas.
 - **CD em 3D:** na aba Centros, "Ver em 3D" mostra o CD como uma maquete isométrica: prédio em corte (as paredes viradas para você ficam baixas, de qualquer ângulo), prateleiras com caixas em cada nível (etiqueta na cor da família do produto), empilhadeiras se movendo em tempo real (com o palete nos garfos quando carregadas), caminhões de ré nas docas com a porta aberta, pátio com vagas e sombras. Sobre a cena ficam os indicadores do CD (paletes em estoque, veículos no pátio, entregas no prazo) e a ocupação das docas. A busca põe marcadores sobre as posições encontradas. Arraste para girar, use a roda para aproximar e o botão direito (ou Shift) para mover.
+- **Painel de operação do CD (estilo jogo de estratégia):** na vista 3D, de longe o CD aparece com telhado e a marca; ao aproximar, buscar um produto ou clicar numa posição, o telhado sai e o interior aparece. Caminhões chegam pela rua e dão ré até a doca, com o caminho pontilhado, e cada um fica na mesma doca até sair. Sobre a cena:
+  - indicadores com tendência dos últimos 15 minutos (paletes em estoque, veículos no pátio, entregas no prazo);
+  - card do CD: status, estoque × capacidade, docas ocupadas, saídas e armazenagens do dia, inventário com selos "Em estoque" / "Estoque baixo" e a frota de empilhadeiras com bateria;
+  - rastreamento em etapas (pedido confirmado → carregando → em trânsito → descarregando → entregue, com horários) do veículo selecionado ou do que está no pátio;
+  - abas Docas / Empilhadeiras / Caminhões;
+  - controles de zoom, giro, vista inicial, telhado, legenda e tela cheia (o painel lateral some e a busca vai para o topo).
 - **Prateleiras e estoque:** na planta, cada prateleira aparece dividida em posições, coloridas pelos níveis ocupados. Clique numa posição para ver o que há em cada nível: produto, SKU, depositante, quantidade, peso, lote, data de entrada e validade, com aviso de vencido ou vencendo. Busque um produto, SKU ou lote para ver em que endereço e em que CD ele está; as posições acendem na planta.
 - **Cadastro de CD:** "+ Novo CD" (no mapa ou na aba Centros) abre um formulário com nome, endereço, localização (digitada ou marcada com um clique no mapa), raio da cerca e as medidas do galpão: largura, comprimento, docas, ruas de prateleira, níveis e posições por rua. A planta é gerada sozinha (docas ao sul, expedição, armazenagem, picking) e aparece numa pré-visualização enquanto você digita. Os CDs cadastrados ficam em `data/centros/<cliente>.json` e podem ser editados e excluídos pelo card do CD.
 - **Movimentação:** entradas e saídas dos CDs são detectadas sozinhas, por uma cerca virtual em volta de cada CD.
@@ -116,6 +122,7 @@ Dentro de um CD (planta, sem GPS), `espaco` é o id do CD e `x`/`y` vêm em metr
 - `previsao` é o **prazo combinado** de chegada. `estimativa` (opcional) é a chegada prevista atualizada, por exemplo calculada pelo rastreador ou pelo TMS.
 - A viagem fica **atrasada** quando o prazo já passou ou quando a estimativa cai depois dele, com tolerância de 1 minuto. Isso vale enquanto a carga não chegou (`planejada`, `carregando` ou `em_transito`).
 - Mande a viagem de novo, com o mesmo `id`, sempre que algo mudar (status, estimativa).
+- O servidor guarda o `historico` de status com horário (cada mudança de status vira um item). Ele vem nas respostas e alimenta o rastreamento em etapas. Não dá para enviá-lo pela API.
 - Quando `origem.cd` ou `destino.cd` aponta para um CD, a viagem entra no painel daquele CD.
 
 ### Estoque (posição-palete)
@@ -150,6 +157,7 @@ Tudo, exceto `/api/config` e `/api/health`, exige o header `x-api-key` com a cha
 | `PUT /api/centros/:id` e `DELETE /api/centros/:id` | Altera ou exclui um CD cadastrado pela tela (os da configuração respondem 409). Endereços que deixam de existir saem do estoque. |
 | `POST /api/estoque` | Paletes nos endereços: um objeto ou uma lista (até 1000). `quantidade: 0` libera o endereço. |
 | `GET /api/centros/:cd/estoque` | Todas as posições ocupadas de um CD. |
+| `GET /api/centros/:cd/hoje` | Movimento do dia no CD (desde a meia-noite do servidor): `saidas`, `chegadas` e `armazenagens`. |
 | `GET /api/estoque?q=&cd=` | Onde está o produto: busca por SKU, descrição, depositante, lote ou endereço em todos os CDs. |
 | `GET /api/eventos?limit=` | Últimas entradas e saídas de CD. |
 | `GET /api/sessao` | Qual cliente a chave identifica e, no cliente de demonstração, quantos veículos foram incluídos. |
@@ -238,10 +246,11 @@ public/
   js/logistica.js   resumo de CD, busca e formatação (código puro, testado)
   js/estoque.js     endereços, ocupação e validade (código puro, também usado pelo servidor)
   js/planta.js      planta gerada das medidas do galpão (código puro, também usado pelo servidor)
+  js/painel.js      etapas, progresso, inventário, tendência, frota e docas estáveis (código puro, testado)
   js/interp.js      interpolação do movimento (código puro, testado)
   js/geoView.js     mapa (MapLibre)    js/indoorView.js  planta do CD (canvas)
   js/isoView.js     CD em 3D isométrico (Three.js, carregado só quando aberto)
-test/             89 testes (node --test)
+test/             97 testes (node --test)
 scripts/          novo-cliente.js, dados-teste.js, fake-device.js, licencas.js
 FrotaLogIA.bat    menu do Windows: instala, testa, inicia, cria cliente
 ```

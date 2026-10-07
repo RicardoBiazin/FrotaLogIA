@@ -161,6 +161,25 @@ export function createApp({
     res.json(estoque.list(req.cliente, req.params.cd));
   });
 
+  // Movimento do dia no CD (desde a meia-noite do servidor): saídas e chegadas de viagens
+  // (pelo histórico de status) e paletes armazenados (data de entrada).
+  api.get('/centros/:cd/hoje', (req, res) => {
+    const cd = req.params.cd;
+    if (!req.tenant.centros.some((c) => c.id === cd)) return res.status(404).json({ erro: 'CD não encontrado' });
+    const inicio = new Date();
+    inicio.setHours(0, 0, 0, 0);
+    const desde = inicio.getTime();
+    const passou = (v, ...status) => (v.historico ?? []).some((h) => status.includes(h.status) && h.em >= desde);
+    let saidas = 0;
+    let chegadas = 0;
+    for (const v of viagens.list(req.cliente)) {
+      if (v.origem?.cd === cd && passou(v, 'em_transito')) saidas++;
+      if (v.destino?.cd === cd && passou(v, 'descarregando', 'entregue')) chegadas++;
+    }
+    const armazenagens = estoque.list(req.cliente, cd).filter((i) => (i.entradaEm ?? 0) >= desde).length;
+    res.json({ desde, saidas, chegadas, armazenagens });
+  });
+
   api.get('/estoque', (req, res) => {
     const q = typeof req.query.q === 'string' ? req.query.q : '';
     const cd = typeof req.query.cd === 'string' ? req.query.cd : undefined;

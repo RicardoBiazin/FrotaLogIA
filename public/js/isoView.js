@@ -9,12 +9,16 @@
 // O Three.js é carregado só quando a vista 3D é aberta (import dinâmico), como o MapLibre.
 import { IndoorView } from './indoorView.js';
 import { tipoOf } from './icons.js';
-import { formatEndereco, parseEndereco } from './estoque.js';
+import { formatEndereco, parseEndereco, FAMILIAS, familiaDe } from './estoque.js';
 
 const LEVEL_H = 1.6; // altura de cada nível da prateleira (m)
 const WALL_H = 7; // pé-direito do galpão
 const WALL_LOW = 0.9; // parede em corte (virada para a câmera)
 const ZOOM_INICIAL = 1.2;
+const ZOOM_SEM_TELHADO = 1.7; // aproximou além disso: o telhado sai e o interior aparece
+const RIDGE_H = 3.6; // altura da cumeeira acima das paredes
+const CHEGADA_MS = [3500, 2500]; // da rua até a frente da doca; ré até encostar
+const SAIDA_MS = [2500, 3000];
 
 const C = {
   fundo: '#eef2f8',
@@ -37,19 +41,8 @@ const C = {
 };
 const ZONE_COLOR = { doca: '#e6edf7', expedicao: '#f6efe0', estoque: '#f7f8fa', picking: '#e9eef8' };
 
-// Faixa colorida das caixas pela família do produto (prefixo do SKU). Desconhecida: cinza azulado.
-export const FAMILIAS = [
-  { prefixo: 'ELE', nome: 'Eletro', cor: '#4a78b5' },
-  { prefixo: 'ALI', nome: 'Alimentos', cor: '#d9a441' },
-  { prefixo: 'BEB', nome: 'Bebidas', cor: '#2f9e8f' },
-  { prefixo: 'HIG', nome: 'Higiene', cor: '#9b7fd1' },
-  { prefixo: 'CON', nome: 'Construção', cor: '#8d8f93' },
-  { prefixo: 'PNE', nome: 'Pneus', cor: '#3d4247' },
-  { prefixo: 'MOV', nome: 'Móveis', cor: '#a0714f' },
-  { prefixo: 'FAR', nome: 'Farmácia', cor: '#d46a8c' },
-];
-const OUTRO = { nome: 'Outros', cor: '#7f9bb3' };
-export const familiaDe = (sku = '') => FAMILIAS.find((f) => sku.toUpperCase().startsWith(f.prefixo)) ?? OUTRO;
+// Cor da família do produto: a mesma regra da tela (estoque.js).
+export { FAMILIAS, familiaDe };
 
 let THREE = null;
 
@@ -293,6 +286,33 @@ export class IsoView {
     this.el = Math.atan(1 / Math.SQRT2); // ~35,26° de elevação
     this.zoom = ZOOM_INICIAL;
     this.target = null;
+    this.telhado = 'auto'; // 'auto' (some ao aproximar, buscar ou selecionar) | 'nunca'
+    this.docagem = new Map(); // veículo → { porta, fase: 'chegando' | 'parado' | 'saindo', t0 }
+    this.primeiroQuadro = true; // quem já está na doca ao abrir o 3D não "chega" de novo
+  }
+
+  // ---------- Controles chamados pelos botões ----------
+
+  zoomBy(fator) {
+    this.zoom = Math.min(8, Math.max(0.4, this.zoom * fator));
+    this.#updateCamera();
+  }
+
+  rotateBy(rad) {
+    this.az += rad;
+    this.#updateCamera();
+  }
+
+  /** 'auto' (padrão) ou 'nunca'. */
+  setTelhado(modo) {
+    this.telhado = modo;
+    this.#updateCamera();
+  }
+
+  /** O telhado aparece de longe e sai quando é preciso ver dentro (zoom, busca, posição selecionada). */
+  #mostraTelhado() {
+    const { destaque, selecionada } = this.estoque;
+    return this.telhado === 'auto' && this.zoom < ZOOM_SEM_TELHADO && !destaque?.size && !selecionada;
   }
 
   async init() {
@@ -404,15 +424,18 @@ export class IsoView {
     this.camera.lookAt(this.target);
     this.camera.zoom = this.zoom;
     this.camera.updateProjectionMatrix();
-    this.#cutaway();
+    if (this.space) this.#cutaway();
   }
 
   /** Paredes viradas para a câmera ficam baixas (corte), para o interior aparecer de qualquer ângulo. */
   #cutaway() {
     const olhar = new THREE.Vector3(Math.sin(this.az), 0, Math.cos(this.az));
+    const telhado = this.#mostraTelhado();
+    if (this.roof) this.roof.visible = telhado;
     let sulAberto = false;
     for (const w of this.walls) {
-      const corte = w.normal.dot(olhar) > 0.15;
+      // Com telhado o prédio fica inteiro (vista de fora); sem telhado, em corte.
+      const corte = !telhado && w.normal.dot(olhar) > 0.15;
       const h = corte ? WALL_LOW : WALL_H;
       w.mesh.scale.y = h;
       w.mesh.position.y = h / 2;
@@ -450,6 +473,8 @@ export class IsoView {
   setSpace(space) {
     this.space = space;
     this.estoqueSig = '';
+    this.docagem.clear();
+    this.primeiroQuadro = true;
     for (const a of this.assets.values()) this.assetGroup.remove(a.group);
     this.assets.clear();
     if (!this.ready) return;
@@ -578,10 +603,53 @@ export class IsoView {
     }
     wall(x, 0, L, 0, [0, 0, 1], true);
 
+    // telhado de duas águas (cumeeira leste–oeste), com a marca numa das águas
+    this.roof = new THREE.Group();
+    const meia = A / 2 + 0.4;
+    const inclin = Math.atan2(RIDGE_H, meia);
+    const agua = Math.hypot(meia, RIDGE_H);
+    const telhaMat = mat('#e9eef7', { roughness: 0.6, side: THREE.DoubleSide });
+    for (const lado of [-1, 1]) {
+      const placaT = mesh(new THREE.BoxGeometry(L + 0.8, 0.25, agua), telhaMat, { recebe: true });
+      placaT.position.set(0, WALL_H + RIDGE_H / 2, (lado * meia) / 2);
+      placaT.rotation.x = lado * inclin;
+      this.roof.add(placaT);
+      // nervuras da telha
+      for (let x = -L / 2 + 3; x < L / 2; x += 6) {
+        const nerv = box(0.18, 0.12, agua, '#cfd8e6');
+        nerv.position.set(x, WALL_H + RIDGE_H / 2 + 0.17, (lado * meia) / 2);
+        nerv.rotation.x = lado * inclin;
+        this.roof.add(nerv);
+      }
+    }
+    const cumeeira = box(L + 1, 0.35, 0.6, C.paredeTopo);
+    cumeeira.position.set(0, WALL_H + RIDGE_H + 0.1, 0);
+    this.roof.add(cumeeira);
+    // oitões (triângulos azuis nas pontas leste e oeste)
+    const tri = new THREE.Shape();
+    tri.moveTo(-meia, 0);
+    tri.lineTo(meia, 0);
+    tri.lineTo(0, RIDGE_H);
+    tri.closePath();
+    for (const lado of [-1, 1]) {
+      const oitao = mesh(new THREE.ShapeGeometry(tri), mat(C.parede, { side: THREE.DoubleSide }));
+      oitao.rotation.y = Math.PI / 2;
+      oitao.position.set(lado * (L / 2 + 0.2), WALL_H, 0);
+      this.roof.add(oitao);
+    }
+    const marca = new THREE.Mesh(
+      new THREE.PlaneGeometry(Math.min(L * 0.5, 30), Math.min(L * 0.5, 30) / 4),
+      new THREE.MeshStandardMaterial({ map: marcaFrotaLogIA(), roughness: 0.7, transparent: true }),
+    );
+    marca.position.set(0, WALL_H + RIDGE_H / 2 + 0.32, meia / 2);
+    marca.rotation.x = -Math.PI / 2 + inclin;
+    this.roof.add(marca);
+    G.add(this.roof);
+
     // nome do CD numa placa sobre a parede norte
     const placa = label(s.nome ?? 'CD', { altura: 2.6, fundo: '#ffffff', cor: C.paredeTopo, peso: 700, borda: C.parede });
     const pc = this.#toWorld(L / 2, A);
-    placa.position.set(pc.x, WALL_H + 2.2, pc.z);
+    placa.position.set(pc.x, WALL_H + RIDGE_H + 2.4, pc.z);
     G.add(placa);
 
     // árvores nos cantos do terreno
@@ -656,7 +724,10 @@ export class IsoView {
     ].join('|');
     if (sig === this.estoqueSig) return;
     this.estoqueSig = sig;
-    if (this.ready && this.space) this.#buildPallets();
+    if (this.ready && this.space) {
+      this.#buildPallets();
+      this.#cutaway();
+    }
   }
 
   #buildPallets() {
@@ -822,23 +893,44 @@ export class IsoView {
       a.group.userData.carga.visible = Boolean(it.carregado);
       vivos.add(it.id);
     }
-    const portas = [...(this.space.portas ?? [])].sort((p, q) => p.x - q.x);
+    // Veículos de rua: entram pela rua, param na frente da doca e dão ré (caminho pontilhado);
+    // ao sair, fazem o caminho de volta. A porta vem atribuída de fora (estável: não troca).
+    const portas = new Map((this.space.portas ?? []).map((p) => [p.nome, p]));
     const ocupadas = new Set();
-    [...docked].sort((p, q) => p.id.localeCompare(q.id)).slice(0, portas.length).forEach((it, i) => {
-      const p = portas[i];
-      const a = this.#asset(it.id, it.tipo, it.status, it.nome, 'doca');
-      const w = this.#toWorld(p.x + p.w / 2, -0.3);
-      a.group.position.set(w.x, 0, w.z);
-      a.group.rotation.y = 0;
-      ocupadas.add(p);
-      vivos.add(it.id);
-    });
-    for (const [id, a] of this.assets) {
-      if (!vivos.has(id)) {
-        this.assetGroup.remove(a.group);
-        this.assets.delete(id);
+    const agora = performance.now();
+    const naDoca = new Map(docked.filter((it) => it.porta && portas.has(it.porta)).map((it) => [it.id, it]));
+    for (const [id, it] of naDoca) {
+      const d = this.docagem.get(id);
+      if (!d || d.fase === 'saindo' || d.porta !== it.porta) {
+        this.docagem.set(id, { porta: it.porta, fase: this.primeiroQuadro ? 'parado' : 'chegando', t0: agora, it });
+      } else {
+        d.it = it;
       }
     }
+    for (const [id, d] of this.docagem) {
+      if (!naDoca.has(id) && d.fase !== 'saindo') Object.assign(d, { fase: 'saindo', t0: agora });
+    }
+    this.primeiroQuadro = false;
+    const trilhas = [];
+    for (const [id, d] of [...this.docagem]) {
+      const p = portas.get(d.porta);
+      if (!p) {
+        this.docagem.delete(id);
+        continue;
+      }
+      const pose = this.#poseDocagem(d, p, agora);
+      if (!pose) {
+        this.docagem.delete(id); // terminou de sair
+        continue;
+      }
+      const a = this.#asset(id, d.it.tipo, d.it.status, d.it.nome, 'doca');
+      a.group.position.set(pose.x, 0, pose.z);
+      a.group.rotation.y = pose.rumo;
+      vivos.add(id);
+      if (d.fase !== 'saindo') ocupadas.add(p);
+      if (pose.trilha) trilhas.push(pose.trilha);
+    }
+    this.#desenharTrilhas(trilhas, t);
     // porta de enrolar aberta onde há veículo encostado
     for (const d of this.doors) {
       const aberta = ocupadas.has(d.porta);
@@ -851,6 +943,71 @@ export class IsoView {
       if (a.marcador.visible) a.marcador.position.y = a.marcador.userData.base + Math.sin(t * 2.2) * 0.25;
     }
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /**
+   * Posição e rumo do veículo na manobra de docagem, ou null quando já saiu do pátio.
+   * Pontos: R (rua), F (frente da doca, 16 m no pátio) e D (encostado). rotation.y: 0 = cabine ao sul.
+   */
+  #poseDocagem(d, p, agora) {
+    const doca = this.#toWorld(p.x + p.w / 2, -0.3);
+    const frente = { x: doca.x, z: doca.z + 17 };
+    const ruaZ = this.space.altura / 2 + 30;
+    const lerp = (a, b, k) => ({ x: a.x + (b.x - a.x) * k, z: a.z + (b.z - a.z) * k });
+    const suave = (k) => k * k * (3 - 2 * k);
+    const rumoDe = (a, b) => Math.atan2(b.x - a.x, b.z - a.z);
+    const dt = agora - d.t0;
+    if (d.fase === 'parado') return { ...doca, rumo: 0 };
+    if (d.fase === 'chegando') {
+      const rua = { x: doca.x + 34, z: ruaZ };
+      const chegada = rumoDe(rua, frente); // de frente, cabine à frente
+      if (dt < CHEGADA_MS[0]) {
+        const k = suave(dt / CHEGADA_MS[0]);
+        return { ...lerp(rua, frente, k), rumo: chegada, trilha: [frente, doca] };
+      }
+      const k = suave(Math.min(1, (dt - CHEGADA_MS[0]) / CHEGADA_MS[1]));
+      if (k >= 1) d.fase = 'parado';
+      // na ré, alinha a cabine para o sul nos primeiros 40% da manobra
+      const giro = Math.min(1, k / 0.4);
+      const delta = Math.atan2(Math.sin(0 - chegada), Math.cos(0 - chegada));
+      return { ...lerp(frente, doca, k), rumo: chegada + delta * giro, trilha: k < 1 ? [frente, doca] : null };
+    }
+    // saindo: anda para a frente até o pátio e depois para a rua (sentido oeste)
+    const rua = { x: doca.x - 34, z: ruaZ };
+    if (dt < SAIDA_MS[0]) {
+      const k = suave(dt / SAIDA_MS[0]);
+      return { ...lerp(doca, frente, k), rumo: 0 };
+    }
+    const k = suave((dt - SAIDA_MS[0]) / SAIDA_MS[1]);
+    if (k >= 1) return null;
+    return { ...lerp(frente, rua, k), rumo: rumoDe(frente, rua) };
+  }
+
+  /** Caminho pontilhado azul da frente da doca até a porta (como numa manobra guiada). */
+  #desenharTrilhas(trilhas, t) {
+    if (!this.trilhaGroup) {
+      this.trilhaGroup = new THREE.Group();
+      this.scene.add(this.trilhaGroup);
+      this.trilhaGeo = new THREE.CircleGeometry(0.35, 16);
+      this.trilhaMat = new THREE.MeshBasicMaterial({ color: C.pin, transparent: true, opacity: 0.9 });
+    }
+    const pontos = [];
+    for (const [a, b] of trilhas) {
+      const n = Math.max(2, Math.round(Math.hypot(b.x - a.x, b.z - a.z) / 1.4));
+      for (let i = 0; i <= n; i++) pontos.push({ x: a.x + ((b.x - a.x) * i) / n, z: a.z + ((b.z - a.z) * i) / n, i, n });
+    }
+    while (this.trilhaGroup.children.length < pontos.length) {
+      const m = new THREE.Mesh(this.trilhaGeo, this.trilhaMat);
+      m.rotation.x = -Math.PI / 2;
+      this.trilhaGroup.add(m);
+    }
+    this.trilhaGroup.children.forEach((m, i) => {
+      const pt = pontos[i];
+      m.visible = Boolean(pt);
+      if (!pt) return;
+      m.position.set(pt.x, 0.05, pt.z);
+      m.scale.setScalar(0.7 + 0.3 * Math.sin(t * 6 - pt.i * 0.6));
+    });
   }
 
   // ---------- Clique ----------

@@ -252,6 +252,18 @@ test('serve o Three.js da vista 3D (módulo e o núcleo que ele importa)', async
   }
 });
 
+test('movimento do dia no CD: saídas, chegadas e armazenagens de hoje', async () => {
+  const sai = viagem({ id: 'VG-HOJE-1', status: 'em_transito', origem: { nome: 'CD Teste', cd: 'cd-1' } });
+  const chega = viagem({ id: 'VG-HOJE-2', status: 'entregue', destino: { nome: 'CD Teste', cd: 'cd-1' } });
+  await post('/api/viagens', [sai, chega], A);
+  await post('/api/estoque', palete({ endereco: 'A-01-3', sku: 'HOJE' }), A);
+  const hoje = await (await get('/api/centros/cd-1/hoje', A)).json();
+  assert.ok(hoje.saidas >= 1);
+  assert.ok(hoje.chegadas >= 1);
+  assert.ok(hoje.armazenagens >= 1);
+  assert.equal((await get('/api/centros/cd-1/hoje', B)).status, 404);
+});
+
 test('JSON inválido responde 400', async () => {
   const res = await post('/api/positions', '{quebrado', A);
   assert.equal(res.status, 400);

@@ -129,10 +129,16 @@ export class ViagemStore extends EventEmitter {
         return { stored: false, reason: `limite de ${this.maxAtivas} viagens ativas atingido` };
       }
     }
+    // Histórico de status com horário (rastreamento em etapas e progresso da viagem na tela).
+    // Vem do servidor, não da entrada: só ganha item novo quando o status muda.
+    const anterior = m.get(viagem.id);
+    const historico = [...(anterior?.historico ?? [])];
+    if (historico.at(-1)?.status !== viagem.status) historico.push({ status: viagem.status, em: viagem.atualizadoEm });
+    const salva = { ...viagem, historico: historico.slice(-20) };
     m.delete(viagem.id); // reinsere no fim: a ordem do Map vira a ordem de atualização
-    m.set(viagem.id, viagem);
+    m.set(viagem.id, salva);
     this.#prune(m);
-    this.emit('update', cliente, viagem);
+    this.emit('update', cliente, salva);
     return { stored: true };
   }
 

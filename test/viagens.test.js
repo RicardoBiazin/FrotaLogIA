@@ -73,3 +73,20 @@ test('store: guarda só as últimas encerradas e limita as ativas', () => {
   const update = store.upsert('c1', normalizeViagem(base({ id: 'A1', status: 'descarregando' }), NOW).viagem);
   assert.equal(update.stored, true);
 });
+
+test('store: histórico de status com horário, só quando o status muda', () => {
+  const store = new ViagemStore();
+  const v = (status, t) => normalizeViagem(base({ status }), NOW + t).viagem;
+  store.upsert('c1', v('carregando', 0));
+  store.upsert('c1', v('carregando', 1000)); // mesma etapa (ex.: estimativa nova): não repete
+  store.upsert('c1', v('em_transito', 60_000));
+  store.upsert('c1', v('descarregando', 120_000));
+  assert.deepEqual(store.get('c1', 'VG-1').historico, [
+    { status: 'carregando', em: NOW },
+    { status: 'em_transito', em: NOW + 60_000 },
+    { status: 'descarregando', em: NOW + 120_000 },
+  ]);
+  // a entrada não consegue forjar o histórico
+  store.upsert('c1', { ...v('entregue', 180_000), historico: [] });
+  assert.equal(store.get('c1', 'VG-1').historico.length, 4);
+});

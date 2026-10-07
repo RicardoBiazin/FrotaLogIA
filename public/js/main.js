@@ -13,6 +13,10 @@ import {
   posicaoKey, parseEndereco,
 } from './estoque.js';
 import { GALPAO_PADRAO, validarGalpao, gerarPlanta, capacidadeGalpao, resumoGalpao } from './planta.js';
+import {
+  etapasViagem, progressoViagem, inventarioTop, registrar, tendencia, frotaEmpilhadeiras, atribuirDocas,
+} from './painel.js';
+import { familiaDe } from './estoque.js';
 
 const $ = (selector) => document.querySelector(selector);
 const els = {
@@ -53,6 +57,9 @@ const state = {
   selectedSlot: null, // { cd, rua, posicao }
   soAtrasados: false, // filtro do contador "em atraso"
   modo3d: false, // planta do CD em 3D isométrico
+  foco: false, // tela cheia (painel lateral escondido)
+  aba: 'docas', // aba do painel de operação no 3D
+  series: new Map(), // indicador → amostras { t, v } (tendência)
   demo: null, // { extras, maxExtras } no cliente de demonstração
   tipos: new Set(TIPOS.map((t) => t.id)),
   query: '',
@@ -220,13 +227,29 @@ function visibleItems(now, view = state.view) {
   return items;
 }
 
-/** Veículos de rua parados no pátio do CD exibido na planta. */
+// Doca de cada veículo no pátio, por CD. Estável: quem encostou não troca de porta quando outro chega.
+const docasPorCd = new Map(); // cd → Map<veiculo, porta | null>
+
+function docasDoCd(cd) {
+  const portas = (cd?.planta?.portas ?? []).map((p) => p.nome);
+  const ids = [];
+  for (const { data: d } of state.assets.values()) if (!d.espaco && d.cd === cd?.id) ids.push(d.id);
+  const m = atribuirDocas(docasPorCd.get(cd?.id) ?? new Map(), ids, portas);
+  if (cd) docasPorCd.set(cd.id, m);
+  return m;
+}
+
+/** Veículos de rua parados no pátio do CD exibido na planta, com a doca de cada um. */
 function dockedItems() {
   const items = [];
   if (!state.space) return items;
+  const docas = docasDoCd(centroById(state.space.id));
   for (const { data: d } of state.assets.values()) {
     if (d.espaco || d.cd !== state.space.id || !matches(d)) continue;
-    items.push({ id: d.id, nome: d.nome, tipo: d.tipo, status: d.status, viagemStatus: state.viagemPorVeiculo.get(d.id)?.status });
+    items.push({
+      id: d.id, nome: d.nome, tipo: d.tipo, status: d.status,
+      viagemStatus: state.viagemPorVeiculo.get(d.id)?.status, porta: docas.get(d.id) ?? null,
+    });
   }
   return items;
 }
@@ -469,61 +492,220 @@ function renderAtributos(atributos) {
   );
 }
 
-/** Painéis sobre a vista 3D: indicadores do CD e ocupação das docas. */
+/** Guarda a amostra do indicador (no máximo uma a cada 30 s) e devolve a variação em 15 min. */
+function amostra(chave, v) {
+  const serie = state.series.get(chave) ?? [];
+  const now = Date.now();
+  if (serie.length && now - serie.at(-1).t < 30_000) serie.at(-1).v = v;
+  else registrar(serie, now, v);
+  state.series.set(chave, serie);
+  return tendencia(serie, now);
+}
+
+function mostrarTendencia(sel, delta, sufixo = '') {
+  const el = $(sel);
+  el.hidden = !delta;
+  if (!delta) return;
+  el.textContent = `${delta > 0 ? '↑' : '↓'} ${fmt(Math.abs(delta))}${sufixo}`;
+  el.dataset.dir = delta > 0 ? 'sobe' : 'desce';
+  el.title = 'Variação nos últimos 15 minutos';
+}
+
+const STATUS_CHIP = {
+  carregando: 'Carregando', descarregando: 'Descarregando', em_transito: 'Em trânsito',
+  planejada: 'Aguardando', entregue: 'Entregue', cancelada: 'Cancelada',
+};
+
+/** Painéis sobre a vista 3D: indicadores, rastreamento e abas de operação. */
 function updateIsoPaineis() {
   if (!state.modo3d || !state.space) return;
   const cd = centroById(state.space.id);
+  if (!cd) return;
   const now = Date.now();
   const itens = [...(state.estoque.get(cd.id)?.values() ?? [])];
   const est = resumoEstoque(itens, cd.planta, now);
-  setText('#iso-kpi-estoque', fmt(est.ocupadas));
-  setText('#iso-kpi-estoque-sub', `${est.percentual}% das posições · ${fmt(est.skus)} SKUs`);
-
   const assets = [...state.assets.values()].map((a) => a.data);
   const r = resumoCentro(cd.id, assets, [...state.viagens.values()]);
+
+  setText('#iso-kpi-estoque', fmt(est.ocupadas));
+  setText('#iso-kpi-estoque-sub', `${est.percentual}% das posições · ${fmt(est.skus)} SKUs`);
+  mostrarTendencia('#iso-kpi-estoque-tend', amostra(`${cd.id}:estoque`, est.ocupadas));
+
   setText('#iso-kpi-patio', fmt(r.patio.length));
   setText('#iso-kpi-patio-sub', r.chegando.length ? `+${r.chegando.length} a caminho` : 'nenhum a caminho');
+  mostrarTendencia('#iso-kpi-patio-tend', amostra(`${cd.id}:patio`, r.patio.length));
 
   // viagens ativas que saem deste CD ou chegam a ele
   const doCd = [...state.viagens.values()].filter((v) => v.origem?.cd === cd.id || v.destino?.cd === cd.id);
   const atrasadas = doCd.filter((v) => atrasoMs(v, now)).length;
-  setText('#iso-kpi-prazo', doCd.length ? `${Math.round(((doCd.length - atrasadas) / doCd.length) * 100)}%` : '—');
+  const pct = doCd.length ? Math.round(((doCd.length - atrasadas) / doCd.length) * 100) : null;
+  setText('#iso-kpi-prazo', pct === null ? '—' : `${pct}%`);
   setText('#iso-kpi-prazo-sub', doCd.length ? `${atrasadas} de ${doCd.length} em atraso` : 'sem viagens ativas');
   $('#iso-kpi-prazo').dataset.alerta = String(atrasadas > 0);
+  mostrarTendencia('#iso-kpi-prazo-tend', pct === null ? null : amostra(`${cd.id}:prazo`, pct), ' p.p.');
 
-  // docas: mesma ordem da planta (veículos do pátio por id, uma porta cada)
-  const portas = [...(cd.planta.portas ?? [])].sort((a, b) => a.x - b.x);
-  const docados = r.patio.slice().sort((a, b) => a.id.localeCompare(b.id));
-  setText('#iso-docas-n', `${Math.min(docados.length, portas.length)}/${portas.length}`);
-  const linhas = portas.map((p, i) => {
-    const d = docados[i];
-    const v = d && state.viagemPorVeiculo.get(d.id);
-    return { porta: p.nome, id: d?.id ?? '', nome: d?.nome ?? 'Livre', status: v ? VIAGEM_LABEL[v.status] : d ? 'no pátio' : '' };
-  });
-  const list = $('#iso-docas-list');
-  const signature = JSON.stringify(linhas);
-  if (list.dataset.sig === signature) return;
-  list.dataset.sig = signature;
-  list.replaceChildren(
-    ...linhas.map((l) => {
-      const li = document.createElement('li');
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'doca-row';
-      b.dataset.livre = String(!l.id);
-      if (l.id) b.dataset.id = l.id;
-      const porta = document.createElement('b');
-      porta.textContent = l.porta;
-      const nome = document.createElement('span');
-      nome.textContent = l.nome;
-      const st = document.createElement('span');
-      st.className = 'muted';
-      st.textContent = l.status;
-      b.append(porta, nome, st);
-      li.append(b);
-      return li;
-    }),
-  );
+  renderRastreio(r);
+  renderAbas(cd, r, assets);
+}
+
+/** Viagem mostrada no rastreamento: a do veículo selecionado; senão a de quem está no pátio; senão a próxima chegada. */
+function viagemDoRastreio(r) {
+  const sel = state.selectedId && state.viagemPorVeiculo.get(state.selectedId);
+  if (sel) return sel;
+  for (const a of r.patio) {
+    const v = state.viagemPorVeiculo.get(a.id);
+    if (v) return v;
+  }
+  return r.chegando[0] ?? null;
+}
+
+function textoProgresso(v, now) {
+  const prog = progressoViagem(v, now);
+  if (v.status === 'em_transito') {
+    if (prog?.restanteMs === null || prog?.restanteMs === undefined) return 'Em trânsito';
+    return prog.restanteMs > 30_000 ? `${formatDuracao(prog.restanteMs)} para chegar` : 'Chegando';
+  }
+  if (v.status === 'carregando') return `Carregando em ${v.origem.nome}`;
+  if (v.status === 'descarregando') return `Descarregando em ${v.destino.nome}`;
+  if (v.status === 'planejada') return 'Aguardando saída';
+  return VIAGEM_LABEL[v.status];
+}
+
+function renderRastreio(r) {
+  const box = $('#iso-rastreio');
+  const v = viagemDoRastreio(r);
+  box.hidden = !v;
+  if (!v) return;
+  const now = Date.now();
+  const veiculo = state.assets.get(v.veiculo)?.data;
+  setText('#rastreio-veiculo', `${veiculo?.nome ?? v.veiculo ?? ''} · ${v.remetente.nome}`);
+  const etapas = etapasViagem(v);
+  const sig = JSON.stringify([v.id, etapas.map((e) => [e.estado, e.em, e.previsto])]);
+  const ol = $('#rastreio-etapas');
+  if (ol.dataset.sig !== sig) {
+    ol.dataset.sig = sig;
+    ol.replaceChildren(
+      ...etapas.map((e) => {
+        const li = document.createElement('li');
+        li.dataset.estado = e.estado;
+        const no = document.createElement('span');
+        no.className = 'no';
+        no.textContent = e.estado === 'feito' ? '✓' : '';
+        const b = document.createElement('b');
+        b.textContent = e.label;
+        const small = document.createElement('small');
+        small.textContent = e.em ? formatHora(e.em) : e.previsto ? `previsto ${formatHora(e.previsto)}` : '';
+        li.append(no, b, small);
+        return li;
+      }),
+    );
+  }
+  setText('#rastreio-id', v.documento ?? v.id);
+  setText('#rastreio-destino', `Para: ${v.destino.nome}`);
+  const chip = $('#rastreio-status');
+  chip.textContent = STATUS_CHIP[v.status] ?? VIAGEM_LABEL[v.status];
+  chip.dataset.status = v.status;
+  const atraso = atrasoMs(v, now);
+  const doca = veiculo?.cd && docasPorCd.get(veiculo.cd)?.get(veiculo.id);
+  const partes = [];
+  if (doca) partes.push(`Doca ${doca}`);
+  partes.push(textoProgresso(v, now));
+  if (atraso) partes.push(`atraso de ${formatDuracao(atraso)}`);
+  setText('#rastreio-linha', partes.join(' · '));
+  $('#rastreio-card').dataset.id = v.veiculo ?? '';
+  $('#rastreio-card').dataset.atraso = String(Boolean(atraso));
+}
+
+function linhaAba({ id, badge, titulo, sub, chip, chipStatus, bateria }) {
+  const li = document.createElement('li');
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'aba-row';
+  if (id) b.dataset.id = id;
+  else b.dataset.livre = 'true';
+  const tag = document.createElement('b');
+  tag.className = 'tag';
+  tag.textContent = badge ?? '';
+  const txt = document.createElement('span');
+  txt.className = 'aba-txt';
+  const t1 = document.createElement('span');
+  t1.textContent = titulo;
+  const t2 = document.createElement('small');
+  t2.textContent = sub ?? '';
+  txt.append(t1, t2);
+  b.append(tag, txt);
+  if (chip) {
+    const c = document.createElement('span');
+    c.className = 'chip';
+    c.dataset.status = chipStatus ?? '';
+    c.textContent = chip;
+    b.append(c);
+  }
+  if (bateria !== undefined && bateria !== null) {
+    const bar = document.createElement('span');
+    bar.className = 'mini-bateria';
+    bar.dataset.nivel = bateria < 25 ? 'baixa' : bateria < 50 ? 'media' : 'ok';
+    bar.title = `Bateria ${bateria}%`;
+    const fill = document.createElement('i');
+    fill.style.width = `${bateria}%`;
+    bar.append(fill);
+    b.append(bar);
+  }
+  li.append(b);
+  return li;
+}
+
+function renderAbas(cd, r, assets) {
+  const portas = cd.planta?.portas ?? [];
+  const docas = docasDoCd(cd);
+  const porPorta = new Map([...docas].filter(([, p]) => p).map(([id, p]) => [p, id]));
+  const frota = frotaEmpilhadeiras(assets, cd.id);
+  const caminhoes = [
+    ...r.patio.map((a) => ({ a, v: state.viagemPorVeiculo.get(a.id), noPatio: true })),
+    ...r.chegando.map((v) => ({ a: state.assets.get(v.veiculo)?.data, v, noPatio: false })),
+  ].filter((c) => c.a);
+  setText('#aba-docas-n', `${porPorta.size}/${portas.length}`);
+  setText('#aba-emp-n', `${frota.trabalhando}/${frota.total}`);
+  setText('#aba-cam-n', fmt(caminhoes.length));
+  setText('#aba-cd', cd.nome);
+  for (const b of document.querySelectorAll('.abas [data-aba]')) b.setAttribute('aria-selected', String(b.dataset.aba === state.aba));
+
+  const now = Date.now();
+  let linhas;
+  if (state.aba === 'empilhadeiras') {
+    linhas = frota.lista.map((e) => ({ id: e.id, badge: e.nome.replace(/\D+/g, '') || '•', titulo: e.nome, sub: e.situacao, bateria: e.bateria }));
+    if (!linhas.length) linhas = [{ titulo: 'Nenhuma empilhadeira neste CD.' }];
+  } else if (state.aba === 'caminhoes') {
+    linhas = caminhoes.map(({ a, v, noPatio }) => {
+      const atraso = v && atrasoMs(v, now);
+      return {
+        id: a.id,
+        badge: noPatio ? docas.get(a.id) ?? 'fila' : '→',
+        titulo: a.nome,
+        sub: noPatio
+          ? (v ? `${v.carga.descricao}` : 'no pátio')
+          : `chega ${formatPrevisao(v.estimativa ?? v.previsao, now)}${atraso ? ` · atraso ${formatDuracao(atraso)}` : ''}`,
+        chip: noPatio ? STATUS_CHIP[v?.status] ?? 'No pátio' : atraso ? 'Atrasado' : 'A caminho',
+        chipStatus: noPatio ? v?.status ?? 'patio' : atraso ? 'atraso' : 'a_caminho',
+      };
+    });
+    if (!linhas.length) linhas = [{ titulo: 'Nenhum veículo no pátio ou a caminho.' }];
+  } else {
+    linhas = portas.map((p) => {
+      const id = porPorta.get(p.nome);
+      const a = id && state.assets.get(id)?.data;
+      const v = id && state.viagemPorVeiculo.get(id);
+      return a
+        ? { id, badge: p.nome, titulo: a.nome, sub: v ? v.carga.descricao : 'no pátio', chip: STATUS_CHIP[v?.status] ?? 'No pátio', chipStatus: v?.status ?? 'patio' }
+        : { badge: p.nome, titulo: 'Livre', sub: '', chip: 'Disponível', chipStatus: 'livre' };
+    });
+    if (!linhas.length) linhas = [{ titulo: 'Este CD não tem docas cadastradas.' }];
+  }
+  const ul = $('#aba-lista');
+  const sig = JSON.stringify([state.aba, linhas]);
+  if (ul.dataset.sig === sig) return;
+  ul.dataset.sig = sig;
+  ul.replaceChildren(...linhas.map(linhaAba));
 }
 
 function updateDetail() {
@@ -572,6 +754,10 @@ function updateDetail() {
     setText('#trip-volumes', v.carga.volumes === null ? '—' : fmt(v.carga.volumes));
     setText('#trip-valor', formatValor(v.carga.valor));
     const agora = Date.now();
+    const prog = progressoViagem(v, agora);
+    $('#trip-progresso-barra').style.width = `${Math.round((prog?.pct ?? 0) * 100)}%`;
+    setText('#trip-progresso-txt', textoProgresso(v, agora));
+    $('#trip-progresso').dataset.atraso = String(Boolean(atrasoMs(v, agora)));
     setText('#trip-previsao', formatPrevisao(v.previsao, agora));
     $('#trip-estimativa-wrap').hidden = !v.estimativa;
     if (v.estimativa) setText('#trip-estimativa', formatPrevisao(v.estimativa, agora));
@@ -614,6 +800,30 @@ function fillMini(selector, items, emptyText) {
   );
 }
 
+// Movimento do dia por CD (GET /api/centros/:cd/hoje), consultado no máximo a cada 15 s.
+const hojeCache = new Map(); // cd → { t, dados }
+
+function carregarHoje(cdId) {
+  const c = hojeCache.get(cdId);
+  if (c && Date.now() - c.t < 15_000) return;
+  hojeCache.set(cdId, { t: Date.now(), dados: c?.dados ?? null });
+  api(`/api/centros/${encodeURIComponent(cdId)}/hoje`)
+    .then((dados) => hojeCache.set(cdId, { t: Date.now(), dados }))
+    .catch(() => {});
+}
+
+function barra(sel, frac) {
+  $(sel).style.width = `${Math.round(Math.min(1, Math.max(0, frac)) * 100)}%`;
+}
+
+function fillLista(sel, linhas, criar) {
+  const el = $(sel);
+  const sig = JSON.stringify(linhas);
+  if (el.dataset.sig === sig) return;
+  el.dataset.sig = sig;
+  el.replaceChildren(...linhas.map(criar));
+}
+
 function updateCdDetail() {
   const cd = state.selectedCd ? centroById(state.selectedCd) : null;
   if (!cd) {
@@ -621,19 +831,88 @@ function updateCdDetail() {
     return;
   }
   els.cdDetail.hidden = false;
+  const now = Date.now();
   const assets = [...state.assets.values()].map((a) => a.data);
   const r = resumoCentro(cd.id, assets, [...state.viagens.values()]);
+  carregarHoje(cd.id);
+  const hoje = hojeCache.get(cd.id)?.dados;
   setText('#cd-name', cd.nome);
   setText('#cd-endereco', cd.endereco ?? '');
-  setText('#cd-patio', fmt(r.patio.length));
-  setText('#cd-chegando', fmt(r.chegando.length));
-  setText('#cd-empilhadeiras', fmt(r.empilhadeiras.length));
-  const now = Date.now();
+
+  const portas = cd.planta?.portas?.length ?? 0;
+  const docados = [...docasDoCd(cd).values()].filter(Boolean).length;
+  setText('#cd-situacao', `${r.patio.length} no pátio · ${r.chegando.length} a caminho`);
+
+  const itens = [...(state.estoque.get(cd.id)?.values() ?? [])];
+  const est = cd.planta ? resumoEstoque(itens, cd.planta, now) : null;
+  setText('#cd-estoque-n', est ? fmt(est.ocupadas) : '—');
+  setText('#cd-estoque-cap', est ? `/ ${fmt(est.total)}` : 'sem prateleiras');
+  barra('#cd-estoque-barra', est?.total ? est.ocupadas / est.total : 0);
+  setText('#cd-docas-n', portas ? fmt(docados) : '—');
+  setText('#cd-docas-cap', portas ? `/ ${portas} ocupadas` : 'sem docas cadastradas');
+  barra('#cd-docas-barra', portas ? docados / portas : 0);
+  setText('#cd-saidas', hoje ? fmt(hoje.saidas) : '—');
+  setText('#cd-armazenagens', hoje ? fmt(hoje.armazenagens) : '—');
+
+  // inventário: os produtos com mais unidades
+  $('#cd-inv').hidden = !est || itens.length === 0;
+  if (est && itens.length) {
+    const venc = est.vencendo + est.vencidos;
+    $('#cd-vencendo').hidden = venc === 0;
+    setText('#cd-vencendo', `${venc} ${venc === 1 ? 'palete vencendo' : 'paletes vencendo'}`);
+    fillLista('#cd-inv-list', inventarioTop(itens, 4), (p) => {
+      const li = document.createElement('li');
+      const cor = document.createElement('i');
+      cor.style.background = familiaDe(p.sku).cor;
+      const nome = document.createElement('span');
+      nome.textContent = p.descricao;
+      const qtd = document.createElement('b');
+      qtd.textContent = `${fmt(p.quantidade)} ${p.unidade}`;
+      const chip = document.createElement('span');
+      chip.className = `chip ${p.situacao === 'baixo' ? 'alerta' : 'ok'}`;
+      chip.textContent = p.situacao === 'baixo' ? 'Estoque baixo' : 'Em estoque';
+      li.append(cor, nome, qtd, chip);
+      return li;
+    });
+  }
+
+  // frota de empilhadeiras
+  const frota = frotaEmpilhadeiras(assets, cd.id);
+  $('#cd-frota').hidden = frota.total === 0;
+  if (frota.total) {
+    setText('#cd-frota-n', `${frota.trabalhando}/${frota.total} trabalhando`);
+    fillLista('#cd-frota-list', frota.lista.slice(0, 4), (e) => {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.id = e.id;
+      const nome = document.createElement('b');
+      nome.textContent = e.nome;
+      const sit = document.createElement('span');
+      sit.textContent = e.situacao;
+      b.append(nome, sit);
+      if (e.bateria !== null) {
+        const bar = document.createElement('span');
+        bar.className = 'mini-bateria';
+        bar.dataset.nivel = e.bateria < 25 ? 'baixa' : e.bateria < 50 ? 'media' : 'ok';
+        const fill = document.createElement('i');
+        fill.style.width = `${e.bateria}%`;
+        const pct = document.createElement('small');
+        pct.textContent = `${e.bateria}%`;
+        bar.append(fill);
+        b.append(bar, pct);
+      }
+      li.append(b);
+      return li;
+    });
+  }
+
   fillMini(
     '#cd-patio-list',
     r.patio.map((a) => {
       const v = state.viagemPorVeiculo.get(a.id);
-      return { id: a.id, text: a.nome, meta: v ? `${VIAGEM_LABEL[v.status]} · ${v.carga.descricao}` : 'sem viagem' };
+      const doca = docasPorCd.get(cd.id)?.get(a.id);
+      return { id: a.id, text: a.nome, meta: `${doca ? `Doca ${doca} · ` : ''}${v ? `${VIAGEM_LABEL[v.status]} · ${v.carga.descricao}` : 'sem viagem'}` };
     }),
     'Nenhum veículo no pátio.',
   );
@@ -654,16 +933,6 @@ function updateCdDetail() {
       .map((e) => ({ id: e.veiculo, text: `${e.nome} ${e.tipo === 'entrada' ? 'entrou' : 'saiu'}`, meta: formatHora(e.ts) })),
     'Sem movimentação recente.',
   );
-  const itens = state.estoque.get(cd.id);
-  $('#cd-estoque').hidden = !itens;
-  if (itens) {
-    const r = resumoEstoque([...itens.values()], cd.planta, now);
-    setText('#cd-ocupacao', `${r.percentual}%`);
-    $('#cd-ocupacao').title = `${fmt(r.ocupadas)} de ${fmt(r.total)} posições-palete`;
-    setText('#cd-skus', fmt(r.skus));
-    setText('#cd-vencendo', fmt(r.vencendo + r.vencidos));
-    $('#cd-vencendo').title = `${r.vencendo} vencem em até 30 dias, ${r.vencidos} vencidos`;
-  }
   $('#cd-planta').hidden = !cd.planta || (state.view === 'indoor' && state.space?.id === cd.id);
   $('#cd-editar').hidden = !cd.cadastrado;
   $('#cd-excluir').hidden = !cd.cadastrado;
@@ -689,6 +958,7 @@ function updateCdLabels() {
 function syncIndoorInsets() {
   if (!indoor) return;
   const card = [els.detail, els.cdDetail, els.slotDetail].find((c) => !c.hidden);
+  $('#iso').dataset.card = card ? 'on' : 'off';
   if (state.view !== 'indoor' || !card) {
     indoor.setInsets(0, 0);
     return;
@@ -729,6 +999,7 @@ function showSpace(cdId) {
   els.cdSelect.value = cd.id;
   indoor.setSpace(state.space);
   iso?.setSpace(state.space);
+  if (state.modo3d && state.selectedCd && state.selectedCd !== cd.id) state.selectedCd = cd.id;
   updateEstoqueView();
 }
 
@@ -1093,10 +1364,14 @@ async function setModo3d(on) {
   $('#iso-reset').hidden = !on;
   $('#iso').hidden = !on;
   els.indoorCanvas.hidden = on;
+  document.querySelector('.stage').classList.toggle('modo3d', on);
   if (on) {
+    // como no painel de operação: sem nada selecionado, o card do CD fica aberto
+    if (!state.selectedId && !state.selectedSlot && state.space) state.selectedCd = state.space.id;
     iso.resize();
     updateEstoqueView();
     updateIsoPaineis();
+    refreshUi();
   } else {
     indoor?.resize();
   }
@@ -1253,6 +1528,20 @@ async function excluirCd() {
   }
 }
 
+/** Tela cheia: esconde o painel lateral; a busca vai para a barra de cima. */
+function setFoco(on) {
+  state.foco = on;
+  document.body.classList.toggle('foco', on);
+  document.querySelector('[data-ctl="tela"]')?.setAttribute('aria-pressed', String(on));
+  document.querySelector('.busca-foco').hidden = !on;
+  $('#search-foco').value = state.query;
+  requestAnimationFrame(() => {
+    geo?.resize();
+    indoor?.resize();
+    iso?.resize();
+  });
+}
+
 function bindEvents() {
   els.search.addEventListener('input', () => {
     state.query = els.search.value;
@@ -1314,9 +1603,50 @@ function bindEvents() {
   $('#marcar-cancelar').addEventListener('click', cancelarMarcacao);
   $('#modo-3d').addEventListener('click', () => setModo3d(!state.modo3d));
   $('#iso-reset').addEventListener('click', () => iso?.resetView());
-  $('#iso-docas-list').addEventListener('click', (e) => {
+  document.querySelector('.iso-controles').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ctl]');
+    if (!b) return;
+    const alterna = () => {
+      const on = b.getAttribute('aria-pressed') !== 'true';
+      b.setAttribute('aria-pressed', String(on));
+      return on;
+    };
+    switch (b.dataset.ctl) {
+      case 'mais': return iso?.zoomBy(1.25);
+      case 'menos': return iso?.zoomBy(0.8);
+      case 'esq': return iso?.rotateBy(Math.PI / 8);
+      case 'dir': return iso?.rotateBy(-Math.PI / 8);
+      case 'telhado': return iso?.setTelhado(alterna() ? 'auto' : 'nunca');
+      case 'cores': {
+        document.querySelector('.iso-legenda').hidden = !alterna();
+        return undefined;
+      }
+      case 'tela': return setFoco(!state.foco);
+      default: return undefined;
+    }
+  });
+  document.querySelector('.abas').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-aba]');
+    if (!b) return;
+    state.aba = b.dataset.aba;
+    updateIsoPaineis();
+  });
+  $('#aba-lista').addEventListener('click', (e) => {
     const row = e.target.closest('[data-id]');
     if (row) select(row.dataset.id);
+  });
+  $('#rastreio-card').addEventListener('click', (e) => {
+    const id = e.currentTarget.dataset.id;
+    if (id) select(id);
+  });
+  $('#cd-frota-list').addEventListener('click', (e) => {
+    const row = e.target.closest('[data-id]');
+    if (row) select(row.dataset.id);
+  });
+  $('#search-foco').addEventListener('input', (e) => {
+    state.query = e.target.value;
+    els.search.value = state.query;
+    refreshUi();
   });
   for (const b of document.querySelectorAll('[data-demo-tipo]')) {
     b.addEventListener('click', () => demoIncluir(b.dataset.demoTipo));
@@ -1339,6 +1669,7 @@ function bindEvents() {
     if (cdForm.marcando) return cancelarMarcacao();
     if (state.selectedId) select(null);
     else if (state.selectedSlot) selectSlot(null);
+    else if (state.foco) setFoco(false);
     else if (state.selectedCd) selectCd(null);
   });
 }

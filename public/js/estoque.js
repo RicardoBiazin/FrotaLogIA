@@ -11,6 +11,20 @@ const ENDERECO_RE = /^([A-Z0-9]{1,4})-(\d{1,3})-(\d{1,2})$/;
 const DIA_MS = 86_400_000;
 export const VENCE_EM_DIAS = 30;
 
+// Cor do produto pela família (prefixo do SKU). Desconhecida: "Outros", cinza azulado.
+export const FAMILIAS = [
+  { prefixo: 'ELE', nome: 'Eletro', cor: '#4a78b5' },
+  { prefixo: 'ALI', nome: 'Alimentos', cor: '#d9a441' },
+  { prefixo: 'BEB', nome: 'Bebidas', cor: '#2f9e8f' },
+  { prefixo: 'HIG', nome: 'Higiene', cor: '#9b7fd1' },
+  { prefixo: 'CON', nome: 'Construção', cor: '#8d8f93' },
+  { prefixo: 'PNE', nome: 'Pneus', cor: '#3d4247' },
+  { prefixo: 'MOV', nome: 'Móveis', cor: '#a0714f' },
+  { prefixo: 'FAR', nome: 'Farmácia', cor: '#d46a8c' },
+];
+const OUTRA_FAMILIA = { nome: 'Outros', cor: '#7f9bb3' };
+export const familiaDe = (sku = '') => FAMILIAS.find((f) => String(sku).toUpperCase().startsWith(f.prefixo)) ?? OUTRA_FAMILIA;
+
 export const pad2 = (n) => String(n).padStart(2, '0');
 export const formatEndereco = (rua, posicao, nivel) => `${rua}-${pad2(posicao)}-${nivel}`;
 export const posicaoKey = (rua, posicao) => `${rua}-${pad2(posicao)}`;

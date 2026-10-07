@@ -117,15 +117,17 @@ export class IndoorView {
     return this.layout.oy + (this.space.altura - y) * this.layout.scale;
   }
 
-  /** Veículos do pátio nas docas (na ordem do id) e os que sobram, aguardando doca. */
+  /** Veículos do pátio na porta atribuída (`porta`) e os sem porta, aguardando doca. */
   #dockSlots(docked) {
     const portas = this.space.portas ?? [];
-    const sorted = [...docked].sort((a, b) => a.id.localeCompare(b.id));
-    const slots = sorted.slice(0, portas.length).map((a, i) => {
-      const p = portas[i];
-      return { ...a, px: this.#sx(p.x + p.w / 2), py: this.#sy(DOCK_Y), rumo: 180 };
-    });
-    return { slots, fila: sorted.slice(portas.length) };
+    const slots = [];
+    const fila = [];
+    for (const a of docked) {
+      const p = a.porta && portas.find((q) => q.nome === a.porta);
+      if (p) slots.push({ ...a, px: this.#sx(p.x + p.w / 2), py: this.#sy(DOCK_Y), rumo: 180 });
+      else fila.push(a);
+    }
+    return { slots, fila };
   }
 
   /**
