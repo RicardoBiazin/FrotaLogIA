@@ -30,7 +30,7 @@ const simFake = {
     return ids;
   },
 };
-const demo = { sim: simFake };
+const demo = { cliente: 'alfa', sim: simFake };
 
 let server;
 let hub;
@@ -103,7 +103,7 @@ test('config e health são públicos e não expõem dados de clientes', async ()
 test('sessão identifica o cliente pela chave', async () => {
   assert.deepEqual(await (await get('/api/sessao', A)).json(), {
     cliente: { id: 'alfa', nome: 'Alfa Transportes' },
-    demo: { extras: 0, maxExtras: 100 }, // alfa é o cliente do simulador neste teste
+    demo: { pronto: true, extras: 0, maxExtras: 100 }, // alfa é o cliente do simulador neste teste
   });
   assert.equal((await (await get('/api/sessao', B)).json()).demo, null);
   assert.equal((await (await get('/api/sessao', B)).json()).cliente.id, 'beta');
@@ -225,6 +225,14 @@ test('demonstração: inclui e remove veículos só no cliente do simulador', as
   const rem = await send('DELETE', null, A);
   assert.deepEqual((await rem.json()).removidos.length, 3);
   assert.equal(simFake.extras(), 0);
+
+  // simulador ainda subindo: a sessão já avisa que há demonstração, e incluir responde 503
+  demo.sim = null;
+  assert.deepEqual((await (await get('/api/sessao', A)).json()).demo, { pronto: false, extras: 0, maxExtras: 100 });
+  const cedo = await send('POST', { tipo: 'carro' }, A);
+  assert.equal(cedo.status, 503);
+  assert.match((await cedo.json()).erro, /iniciando/);
+  demo.sim = simFake;
 });
 
 test('viagem guarda a estimativa e recusa estimativa inválida', async () => {

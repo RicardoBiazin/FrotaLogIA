@@ -6,17 +6,28 @@ import { fileURLToPath } from 'node:url';
 
 const CACHE_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.cache/routes.json');
 
-async function readCache() {
-  try {
-    return JSON.parse(await fs.readFile(CACHE_FILE, 'utf8'));
-  } catch {
-    return {};
-  }
+// As rotas são buscadas em paralelo. Antes, cada busca lia o arquivo, acrescentava a sua e gravava
+// tudo: uma sobrescrevia a outra e a perdedora nunca ficava salva (e era rebuscada a cada início,
+// atrasando o simulador). Agora há um só objeto em memória e as gravações vão em fila.
+let cachePromise = null;
+let writing = Promise.resolve();
+
+function readCache() {
+  cachePromise ??= fs
+    .readFile(CACHE_FILE, 'utf8')
+    .then((text) => JSON.parse(text))
+    .catch(() => ({}));
+  return cachePromise;
 }
 
-async function writeCache(cache) {
-  await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
-  await fs.writeFile(CACHE_FILE, JSON.stringify(cache));
+function writeCache(cache) {
+  writing = writing
+    .then(async () => {
+      await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
+      await fs.writeFile(CACHE_FILE, JSON.stringify(cache));
+    })
+    .catch((err) => console.warn(`[sim] não foi possível gravar o cache de rotas: ${err.message}`));
+  return writing;
 }
 
 /** @returns {Promise<Array<[number, number]> | null>} pontos [lat, lon] ou null */

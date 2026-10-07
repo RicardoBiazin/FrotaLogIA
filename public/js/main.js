@@ -124,6 +124,8 @@ function applyTrail() {
 }
 
 function onSnapshot({ cliente, assets, viagens, eventos }) {
+  // Snapshot novo = (re)conexão, talvez com o servidor reiniciado: a demonstração pode ter mudado.
+  if (state.cliente) atualizarSessaoDemo();
   state.cliente = cliente;
   $('#cliente-nome').textContent = cliente.nome;
   const now = performance.now();
@@ -980,10 +982,32 @@ async function apiSend(method, path, body) {
   return data;
 }
 
+let demoPoll = null;
+
+/** Reconsulta a sessão até o simulador ficar pronto (ele sobe depois de buscar as rotas). */
+async function atualizarSessaoDemo() {
+  try {
+    const sessao = await api('/api/sessao');
+    state.demo = sessao.demo;
+  } catch {
+    return;
+  }
+  renderDemo();
+  clearTimeout(demoPoll);
+  if (state.demo && !state.demo.pronto) demoPoll = setTimeout(atualizarSessaoDemo, 3000);
+}
+
 function renderDemo(mensagem) {
   const box = $('#demo');
   box.hidden = !state.demo;
   if (!state.demo) return;
+  const pronto = state.demo.pronto !== false;
+  for (const b of document.querySelectorAll('[data-demo-tipo]')) b.disabled = !pronto;
+  if (!pronto) {
+    setText('#demo-status', 'O simulador está iniciando…');
+    $('#demo-remover').hidden = true;
+    return;
+  }
   const { extras, maxExtras } = state.demo;
   $('#demo-remover').hidden = extras === 0;
   $('#demo-remover').textContent = `Remover incluídos (${extras})`;
@@ -1228,6 +1252,7 @@ async function boot() {
   buildCdPicker();
   bindEvents();
   renderDemo();
+  if (state.demo && !state.demo.pronto) atualizarSessaoDemo();
 
   indoor = new IndoorView($('#indoor'), els.indoorCanvas, {
     onSelect: select,

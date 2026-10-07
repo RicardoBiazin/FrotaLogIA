@@ -51,10 +51,10 @@ const publicCentro = (c) => ({
 });
 
 /**
- * @param demo { sim } — simulador em execução (ou sim: null). Só o cliente que ele alimenta
- *             pode incluir/remover veículos de demonstração.
+ * @param demo { cliente, sim } — cliente que o simulador alimenta (conhecido logo na partida) e o
+ *             simulador em execução (null enquanto ele sobe). Só esse cliente inclui/remove veículos.
  */
-export function createApp({ config, store, viagens, eventos, estoque, ingest, tenants, demo = { sim: null }, version = null }) {
+export function createApp({ config, store, viagens, eventos, estoque, ingest, tenants, demo = { cliente: null, sim: null }, version = null }) {
   const app = express();
   app.disable('x-powered-by');
   app.use(securityHeaders);
@@ -97,18 +97,20 @@ export function createApp({ config, store, viagens, eventos, estoque, ingest, te
   // ---- Do cliente ----
   api.use(requireTenant);
 
-  const isDemo = (req) => Boolean(demo.sim) && demo.sim.cliente === req.cliente;
+  const isDemo = (req) => Boolean(demo.cliente) && demo.cliente === req.cliente;
+  const naoPronto = (res) => res.status(503).json({ erro: 'o simulador ainda está iniciando; tente de novo em alguns segundos' });
 
   api.get('/sessao', (req, res) =>
     res.json({
       cliente: { id: req.tenant.id, nome: req.tenant.nome },
-      demo: isDemo(req) ? { extras: demo.sim.extras(), maxExtras: MAX_EXTRAS } : null,
+      demo: isDemo(req) ? { pronto: Boolean(demo.sim), extras: demo.sim?.extras() ?? 0, maxExtras: MAX_EXTRAS } : null,
     }),
   );
 
   // Demonstração: incluir e remover veículos simulados com a frota rodando.
   api.post('/demo/veiculos', (req, res) => {
     if (!isDemo(req)) return res.status(403).json({ erro: 'disponível só no cliente de demonstração, com o simulador ligado' });
+    if (!demo.sim) return naoPronto(res);
     const tipo = req.body?.tipo;
     const quantidade = Number(req.body?.quantidade ?? 1);
     if (!Number.isInteger(quantidade) || quantidade < 1 || quantidade > 20) {
@@ -124,6 +126,7 @@ export function createApp({ config, store, viagens, eventos, estoque, ingest, te
 
   api.delete('/demo/veiculos', (req, res) => {
     if (!isDemo(req)) return res.status(403).json({ erro: 'disponível só no cliente de demonstração, com o simulador ligado' });
+    if (!demo.sim) return naoPronto(res);
     res.json({ removidos: demo.sim.removeExtras(), extras: 0 });
   });
 

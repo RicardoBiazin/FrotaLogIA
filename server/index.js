@@ -30,7 +30,8 @@ const viagens = new ViagemStore();
 const eventos = new EventLog();
 const estoque = new EstoqueStore();
 const ingest = createIngest({ store, viagens, eventos, estoque, tenants });
-const demo = { sim: null }; // preenchido quando o simulador terminar de subir
+// cliente: definido na partida; sim: preenchido quando o simulador terminar de subir (rotas do OSRM)
+const demo = { cliente: null, sim: null };
 const app = createApp({ config, store, viagens, eventos, estoque, ingest, tenants, demo, version: VERSION });
 const server = http.createServer(app);
 const hub = createHub({ server, store, viagens, eventos, estoque, tenants, batchMs: config.batchMs });
@@ -70,6 +71,7 @@ server.listen(config.port, host, () => {
       );
       return;
     }
+    demo.cliente = sim.id;
     startSimulation({
       ingest,
       config,
