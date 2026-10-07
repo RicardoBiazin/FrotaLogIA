@@ -1340,6 +1340,8 @@ async function setModo3d(on) {
       );
       $('#iso').hidden = false; // o renderizador precisa do tamanho do contêiner
       await iso.init();
+      // Depuração: ?debug=1 expõe a vista 3D no console (window.__frotalogia.iso).
+      if (new URLSearchParams(location.search).has('debug')) globalThis.__frotalogia = { iso };
       iso.setSelected(state.selectedId);
       if (state.space) iso.setSpace(state.space);
     } catch (err) {

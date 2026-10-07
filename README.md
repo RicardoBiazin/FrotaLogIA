@@ -250,7 +250,7 @@ public/
   js/interp.js      interpolação do movimento (código puro, testado)
   js/geoView.js     mapa (MapLibre)    js/indoorView.js  planta do CD (canvas)
   js/isoView.js     CD em 3D isométrico (Three.js, carregado só quando aberto)
-test/             97 testes (node --test)
+test/             98 testes (node --test)
 scripts/          novo-cliente.js, dados-teste.js, fake-device.js, licencas.js
 FrotaLogIA.bat    menu do Windows: instala, testa, inicia, cria cliente
 ```

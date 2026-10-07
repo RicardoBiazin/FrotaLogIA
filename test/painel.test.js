@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   etapasViagem, progressoViagem, inventarioTop, registrar, tendencia, frotaEmpilhadeiras, atribuirDocas,
+  poseDocagem, CHEGADA_MS, SAIDA_MS,
 } from '../public/js/painel.js';
 
 const MIN = 60_000;
@@ -82,4 +83,34 @@ test('docas: quem está encostado não troca de porta; quem chega pega a primeir
   assert.deepEqual([...m], [['T2', 'D2'], ['T9', 'D1'], ['T1', 'D3'], ['T7', null]]);
   m = atribuirDocas(m, ['T9', 'T1', 'T7'], ['D1', 'D3']); // porta D2 deixou de existir (CD editado)
   assert.deepEqual([...m], [['T9', 'D1'], ['T1', 'D3'], ['T7', null]]);
+});
+
+test('docagem 3D: chegada e saída de cada doca nunca entram no prédio, e a saída termina', () => {
+  const planta = { largura: 90, altura: 56 };
+  const portas = [8, 22, 36, 50, 64, 78].map((x) => ({ x: x - 3, w: 6 }));
+  const dentro = (p) => Math.abs(p.x) < planta.largura / 2 + 1 && p.z < planta.altura / 2 - 0.5;
+  for (const porta of portas) {
+    // chegada: da rua até encostar, e vira "parado"
+    const d = { fase: 'chegando', t0: 0 };
+    let ultima = null;
+    for (let t = 0; t <= CHEGADA_MS[0] + CHEGADA_MS[1] + 500; t += 50) {
+      ultima = poseDocagem(d, porta, planta, t);
+      assert.ok(!dentro(ultima), `chegada pela doca em x=${porta.x}, t=${t}: ${JSON.stringify(ultima)}`);
+    }
+    assert.equal(ultima.fase, 'parado');
+    assert.ok(Math.abs(ultima.z - (planta.altura / 2 + 0.3)) < 1e-9); // encostado na parede sul
+    // saída: nunca atravessa o prédio e depois some (null) — antes, passado o fim, voltava pelo galpão
+    const s = { fase: 'saindo', t0: 0 };
+    let sumiu = false;
+    for (let t = 0; t <= SAIDA_MS[0] + SAIDA_MS[1] + 10_000; t += 50) {
+      const p = poseDocagem(s, porta, planta, t);
+      if (!p) {
+        sumiu = true;
+        continue;
+      }
+      assert.ok(!sumiu, 'depois de sumir não volta');
+      assert.ok(!dentro(p), `saída pela doca em x=${porta.x}, t=${t}: ${JSON.stringify(p)}`);
+    }
+    assert.ok(sumiu);
+  }
 });

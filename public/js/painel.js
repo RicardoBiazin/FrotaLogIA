@@ -128,3 +128,52 @@ export function atribuirDocas(anterior, ids, portas) {
   }
   return atual;
 }
+
+// Manobra de docagem na vista 3D (tempos em ms): da rua até a frente da doca; ré até encostar;
+// da doca até o pátio; do pátio até a rua.
+export const CHEGADA_MS = [3500, 2500];
+export const SAIDA_MS = [2500, 3000];
+
+const suave = (k) => k * k * (3 - 2 * k); // só vale para k em [0, 1]: fora disso, volta para trás
+const lerp = (a, b, k) => ({ x: a.x + (b.x - a.x) * k, z: a.z + (b.z - a.z) * k });
+const rumoDe = (a, b) => Math.atan2(b.x - a.x, b.z - a.z);
+
+/**
+ * Posição do veículo na manobra de docagem, nas coordenadas da cena 3D (X = leste, Z = sul,
+ * origem no centro da planta; rumo = rotation.y, 0 = cabine para o sul).
+ * @param d      { fase: 'chegando' | 'parado' | 'saindo', t0 }
+ * @param porta  { x, w } da planta (lado sul, y = 0)
+ * @param planta { largura, altura }
+ * @returns { x, z, rumo, trilha?, fase } — `fase` 'parado' quando a ré terminou — ou null quando
+ *          o veículo já deixou o pátio (pode sair da cena).
+ */
+export function poseDocagem(d, porta, planta, agora) {
+  const doca = { x: porta.x + porta.w / 2 - planta.largura / 2, z: planta.altura / 2 + 0.3 };
+  const frente = { x: doca.x, z: doca.z + 17 };
+  const ruaZ = planta.altura / 2 + 30;
+  const dt = Math.max(0, agora - d.t0);
+  if (d.fase === 'parado') return { ...doca, rumo: 0, fase: 'parado' };
+  if (d.fase === 'chegando') {
+    const rua = { x: doca.x + 34, z: ruaZ };
+    const chegada = rumoDe(rua, frente); // de frente, cabine à frente
+    if (dt < CHEGADA_MS[0]) {
+      return { ...lerp(rua, frente, suave(dt / CHEGADA_MS[0])), rumo: chegada, trilha: [frente, doca], fase: 'chegando' };
+    }
+    const k = Math.min(1, (dt - CHEGADA_MS[0]) / CHEGADA_MS[1]);
+    // na ré, alinha a cabine para o sul nos primeiros 40% da manobra
+    const giro = Math.min(1, k / 0.4);
+    const delta = Math.atan2(Math.sin(-chegada), Math.cos(-chegada));
+    return {
+      ...lerp(frente, doca, suave(k)),
+      rumo: chegada + delta * giro,
+      trilha: k < 1 ? [frente, doca] : null,
+      fase: k >= 1 ? 'parado' : 'chegando',
+    };
+  }
+  // saindo: de frente até o pátio e depois para a rua (sentido oeste)
+  const rua = { x: doca.x - 34, z: ruaZ };
+  if (dt < SAIDA_MS[0]) return { ...lerp(doca, frente, suave(dt / SAIDA_MS[0])), rumo: 0, fase: 'saindo' };
+  const k = (dt - SAIDA_MS[0]) / SAIDA_MS[1];
+  if (k >= 1) return null; // confere o fim ANTES de suavizar (suave de k > 1 volta para trás)
+  return { ...lerp(frente, rua, suave(k)), rumo: rumoDe(frente, rua), fase: 'saindo' };
+}

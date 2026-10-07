@@ -10,6 +10,7 @@
 import { IndoorView } from './indoorView.js';
 import { tipoOf } from './icons.js';
 import { formatEndereco, parseEndereco, FAMILIAS, familiaDe } from './estoque.js';
+import { poseDocagem } from './painel.js';
 
 const LEVEL_H = 1.6; // altura de cada nível da prateleira (m)
 const WALL_H = 7; // pé-direito do galpão
@@ -17,8 +18,7 @@ const WALL_LOW = 0.9; // parede em corte (virada para a câmera)
 const ZOOM_INICIAL = 1.2;
 const ZOOM_SEM_TELHADO = 1.7; // aproximou além disso: o telhado sai e o interior aparece
 const RIDGE_H = 3.6; // altura da cumeeira acima das paredes
-const CHEGADA_MS = [3500, 2500]; // da rua até a frente da doca; ré até encostar
-const SAIDA_MS = [2500, 3000];
+
 
 const C = {
   fundo: '#eef2f8',
@@ -918,7 +918,8 @@ export class IsoView {
         this.docagem.delete(id);
         continue;
       }
-      const pose = this.#poseDocagem(d, p, agora);
+      const pose = poseDocagem(d, p, this.space, agora);
+      if (pose) d.fase = pose.fase;
       if (!pose) {
         this.docagem.delete(id); // terminou de sair
         continue;
@@ -943,44 +944,6 @@ export class IsoView {
       if (a.marcador.visible) a.marcador.position.y = a.marcador.userData.base + Math.sin(t * 2.2) * 0.25;
     }
     this.renderer.render(this.scene, this.camera);
-  }
-
-  /**
-   * Posição e rumo do veículo na manobra de docagem, ou null quando já saiu do pátio.
-   * Pontos: R (rua), F (frente da doca, 16 m no pátio) e D (encostado). rotation.y: 0 = cabine ao sul.
-   */
-  #poseDocagem(d, p, agora) {
-    const doca = this.#toWorld(p.x + p.w / 2, -0.3);
-    const frente = { x: doca.x, z: doca.z + 17 };
-    const ruaZ = this.space.altura / 2 + 30;
-    const lerp = (a, b, k) => ({ x: a.x + (b.x - a.x) * k, z: a.z + (b.z - a.z) * k });
-    const suave = (k) => k * k * (3 - 2 * k);
-    const rumoDe = (a, b) => Math.atan2(b.x - a.x, b.z - a.z);
-    const dt = agora - d.t0;
-    if (d.fase === 'parado') return { ...doca, rumo: 0 };
-    if (d.fase === 'chegando') {
-      const rua = { x: doca.x + 34, z: ruaZ };
-      const chegada = rumoDe(rua, frente); // de frente, cabine à frente
-      if (dt < CHEGADA_MS[0]) {
-        const k = suave(dt / CHEGADA_MS[0]);
-        return { ...lerp(rua, frente, k), rumo: chegada, trilha: [frente, doca] };
-      }
-      const k = suave(Math.min(1, (dt - CHEGADA_MS[0]) / CHEGADA_MS[1]));
-      if (k >= 1) d.fase = 'parado';
-      // na ré, alinha a cabine para o sul nos primeiros 40% da manobra
-      const giro = Math.min(1, k / 0.4);
-      const delta = Math.atan2(Math.sin(0 - chegada), Math.cos(0 - chegada));
-      return { ...lerp(frente, doca, k), rumo: chegada + delta * giro, trilha: k < 1 ? [frente, doca] : null };
-    }
-    // saindo: anda para a frente até o pátio e depois para a rua (sentido oeste)
-    const rua = { x: doca.x - 34, z: ruaZ };
-    if (dt < SAIDA_MS[0]) {
-      const k = suave(dt / SAIDA_MS[0]);
-      return { ...lerp(doca, frente, k), rumo: 0 };
-    }
-    const k = suave((dt - SAIDA_MS[0]) / SAIDA_MS[1]);
-    if (k >= 1) return null;
-    return { ...lerp(frente, rua, k), rumo: rumoDe(frente, rua) };
   }
 
   /** Caminho pontilhado azul da frente da doca até a porta (como numa manobra guiada). */
