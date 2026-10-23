@@ -9,28 +9,26 @@ Gerado por `npm run licencas`. Não edite à mão.
 |---|---|---|
 | @mapbox/jsonlint-lines-primitives | 2.0.3 | MIT |
 | @mapbox/point-geometry | 1.1.0 | ISC |
-| @mapbox/tiny-sdf | 2.2.0 | BSD-2-Clause |
+| @mapbox/tiny-sdf | 2.3.0 | BSD-2-Clause |
 | @mapbox/unitbezier | 1.0.0 | BSD-2-Clause |
 | @mapbox/vector-tile | 3.0.0 | BSD-3-Clause |
-| @maplibre/geojson-vt | 6.1.2 | ISC |
+| @maplibre/geojson-vt | 6.3.0 | ISC |
 | @maplibre/maplibre-gl-style-spec | 26.4.4 | ISC |
 | @maplibre/mlt | 1.3.0 | (MIT OR Apache-2.0) |
 | @maplibre/vt-pbf | 4.3.2 | MIT |
 | @types/geojson | 7946.0.16 | MIT |
-| accepts | 1.3.8 | MIT |
-| array-flatten | 1.1.1 | MIT |
+| accepts | 2.0.0 | MIT |
 | bidi-js | 1.1.0 | MIT |
-| body-parser | 1.20.8 | MIT |
+| body-parser | 2.4.0 | MIT |
 | bytes | 3.1.2 | MIT |
 | call-bind-apply-helpers | 1.0.2 | MIT |
 | call-bound | 1.0.4 | MIT |
-| content-disposition | 0.5.4 | MIT |
-| content-type | 1.0.5 | MIT |
+| content-disposition | 2.0.1 | MIT |
+| content-type | 2.1.0 | MIT |
 | cookie | 0.7.2 | MIT |
-| cookie-signature | 1.0.7 | MIT |
-| debug | 2.6.9 | MIT |
+| cookie-signature | 1.2.2 | MIT |
+| debug | 4.4.3 | MIT |
 | depd | 2.0.0 | MIT |
-| destroy | 1.2.0 | MIT |
 | dunder-proto | 1.0.1 | MIT |
 | earcut | 3.2.4 | ISC |
 | ee-first | 1.1.1 | MIT |
@@ -40,10 +38,10 @@ Gerado por `npm run licencas`. Não edite à mão.
 | es-object-atoms | 1.1.2 | MIT |
 | escape-html | 1.0.3 | MIT |
 | etag | 1.8.1 | MIT |
-| express | 4.22.3 | MIT |
-| finalhandler | 1.3.2 | MIT |
+| express | 5.3.0 | MIT |
+| finalhandler | 2.1.1 | MIT |
 | forwarded | 0.2.0 | MIT |
-| fresh | 0.5.2 | MIT |
+| fresh | 2.0.0 | MIT |
 | function-bind | 1.1.2 | MIT |
 | get-intrinsic | 1.3.0 | MIT |
 | get-proto | 1.0.1 | MIT |
@@ -52,42 +50,41 @@ Gerado por `npm run licencas`. Não edite à mão.
 | has-symbols | 1.1.0 | MIT |
 | hasown | 2.0.4 | MIT |
 | http-errors | 2.0.1 | MIT |
-| iconv-lite | 0.4.24 | MIT |
+| iconv-lite | 0.7.3 | MIT |
 | inherits | 2.0.4 | ISC |
 | ipaddr.js | 1.9.1 | MIT |
+| is-promise | 4.0.0 | MIT |
 | json-stringify-pretty-compact | 4.0.0 | MIT |
 | kdbush | 4.1.0 | ISC |
-| maplibre-gl | 6.12.0 | BSD-3-Clause |
+| maplibre-gl | 6.15.0 | BSD-3-Clause |
 | math-intrinsics | 1.1.0 | MIT |
-| media-typer | 0.3.0 | MIT |
-| merge-descriptors | 1.0.3 | MIT |
-| methods | 1.1.2 | MIT |
-| mime | 1.6.0 | MIT |
-| mime-db | 1.52.0 | MIT |
-| mime-types | 2.1.35 | MIT |
+| media-typer | 1.1.1 | MIT |
+| merge-descriptors | 2.0.0 | MIT |
+| mime-db | 1.54.0 | MIT |
+| mime-types | 3.0.2 | MIT |
 | minimist | 1.2.8 | MIT |
-| ms | 2.0.0 | MIT |
 | ms | 2.1.3 | MIT |
 | murmurhash-js | 1.0.0 | MIT |
-| negotiator | 0.6.3 | MIT |
+| negotiator | 1.1.0 | MIT |
 | object-inspect | 1.13.4 | MIT |
-| on-finished | 2.4.1 | MIT |
+| on-finished | 2.4.2 | MIT |
+| once | 1.4.0 | ISC |
 | parseurl | 1.3.3 | MIT |
-| path-to-regexp | 0.1.13 | MIT |
+| path-to-regexp | 8.4.2 | MIT |
 | pbf | 5.1.2 | BSD-3-Clause |
 | potpack | 2.1.0 | ISC |
 | protocol-buffers-schema | 3.6.1 | MIT |
 | proxy-addr | 2.0.8 | MIT |
-| qs | 6.16.0 | BSD-3-Clause |
+| qs | 6.16.1 | BSD-3-Clause |
 | quickselect | 3.0.0 | ISC |
-| range-parser | 1.2.1 | MIT |
-| raw-body | 2.5.3 | MIT |
+| range-parser | 1.3.0 | MIT |
+| raw-body | 3.0.2 | MIT |
 | require-from-string | 2.0.2 | MIT |
 | resolve-protobuf-schema | 2.1.0 | MIT |
-| safe-buffer | 5.2.1 | MIT |
+| router | 2.2.0 | MIT |
 | safer-buffer | 2.1.2 | MIT |
-| send | 0.19.2 | MIT |
-| serve-static | 1.16.3 | MIT |
+| send | 1.2.1 | MIT |
+| serve-static | 2.2.1 | MIT |
 | setprototypeof | 1.2.0 | ISC |
 | side-channel | 1.1.1 | MIT |
 | side-channel-list | 1.0.1 | MIT |
@@ -97,10 +94,10 @@ Gerado por `npm run licencas`. Não edite à mão.
 | three | 0.186.1 | MIT |
 | tinyqueue | 3.0.0 | ISC |
 | toidentifier | 1.0.1 | MIT |
-| type-is | 1.6.18 | MIT |
+| type-is | 2.1.0 | MIT |
 | unpipe | 1.0.0 | MIT |
-| utils-merge | 1.0.1 | MIT |
 | vary | 1.1.2 | MIT |
+| wrappy | 1.0.2 | ISC |
 | ws | 8.22.0 | MIT |
 
 ## Serviços e dados externos
@@ -160,7 +157,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### @mapbox/tiny-sdf@2.2.0 (BSD-2-Clause)
+### @mapbox/tiny-sdf@2.3.0 (BSD-2-Clause)
 
 Origem: git+https://github.com/mapbox/tiny-sdf.git
 
@@ -245,7 +242,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### @maplibre/geojson-vt@6.1.2 (ISC)
+### @maplibre/geojson-vt@6.3.0 (ISC)
 
 Origem: https://github.com/maplibre/geojson-vt
 
@@ -742,7 +739,7 @@ MIT License
     SOFTWARE
 ```
 
-### accepts@1.3.8 (MIT)
+### accepts@2.0.0 (MIT)
 
 Origem: jshttp/accepts
 
@@ -770,34 +767,6 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
-### array-flatten@1.1.1 (MIT)
-
-Origem: git://github.com/blakeembrey/array-flatten.git
-
-```
-The MIT License (MIT)
-
-Copyright (c) 2014 Blake Embrey (hello@blakeembrey.com)
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
 ```
 
 ### bidi-js@1.1.0 (MIT)
@@ -829,7 +798,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### body-parser@1.20.8 (MIT)
+### body-parser@2.4.0 (MIT)
 
 Origem: expressjs/body-parser
 
@@ -945,7 +914,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### content-disposition@0.5.4 (MIT)
+### content-disposition@2.0.1 (MIT)
 
 Origem: jshttp/content-disposition
 
@@ -974,7 +943,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### content-type@1.0.5 (MIT)
+### content-type@2.1.0 (MIT)
 
 Origem: jshttp/content-type
 
@@ -1033,34 +1002,58 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### cookie-signature@1.0.7 (MIT)
+### cookie-signature@1.2.2 (MIT)
 
 Origem: https://github.com/visionmedia/node-cookie-signature.git
-
-Licença MIT; o pacote não traz o texto completo.
-
-### debug@2.6.9 (MIT)
-
-Origem: git://github.com/visionmedia/debug.git
 
 ```
 (The MIT License)
 
-Copyright (c) 2014 TJ Holowaychuk <tj@vision-media.ca>
+Copyright (c) 2012–2024 LearnBoost <tj@learnboost.com> and other contributors;
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software 
-and associated documentation files (the 'Software'), to deal in the Software without restriction, 
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, 
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+'Software'), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### debug@4.4.3 (MIT)
+
+Origem: git://github.com/debug-js/debug.git
+
+```
+(The MIT License)
+
+Copyright (c) 2014-2017 TJ Holowaychuk <tj@vision-media.ca>
+Copyright (c) 2018-2021 Josh Junon
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+and associated documentation files (the 'Software'), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
 and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
 subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all copies or substantial 
+The above copyright notice and this permission notice shall be included in all copies or substantial
 portions of the Software.
 
-THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT 
-LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
@@ -1091,35 +1084,6 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
-### destroy@1.2.0 (MIT)
-
-Origem: stream-utils/destroy
-
-```
-The MIT License (MIT)
-
-Copyright (c) 2014 Jonathan Ong me@jongleberry.com
-Copyright (c) 2015-2022 Douglas Christopher Wilson doug@somethingdoug.com
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
 ```
 
 ### dunder-proto@1.0.1 (MIT)
@@ -1373,7 +1337,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### express@4.22.3 (MIT)
+### express@5.3.0 (MIT)
 
 Origem: expressjs/express
 
@@ -1404,7 +1368,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### finalhandler@1.3.2 (MIT)
+### finalhandler@2.1.1 (MIT)
 
 Origem: pillarjs/finalhandler
 
@@ -1462,7 +1426,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### fresh@0.5.2 (MIT)
+### fresh@2.0.0 (MIT)
 
 Origem: jshttp/fresh
 
@@ -1713,9 +1677,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### iconv-lite@0.4.24 (MIT)
+### iconv-lite@0.7.3 (MIT)
 
-Origem: git://github.com/ashtuchkin/iconv-lite.git
+Origem: https://github.com/pillarjs/iconv-lite.git
 
 ```
 Copyright (c) 2011 Alexander Shtuchkin
@@ -1788,6 +1752,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
+### is-promise@4.0.0 (MIT)
+
+Origem: https://github.com/then/is-promise.git
+
+```
+Copyright (c) 2014 Forbes Lindesay
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
 ### json-stringify-pretty-compact@4.0.0 (MIT)
 
 Origem: lydell/json-stringify-pretty-compact
@@ -1838,7 +1828,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ```
 
-### maplibre-gl@6.12.0 (BSD-3-Clause)
+### maplibre-gl@6.15.0 (BSD-3-Clause)
 
 Origem: https://github.com/maplibre/maplibre-gl-js
 
@@ -1989,14 +1979,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### media-typer@0.3.0 (MIT)
+### media-typer@1.1.1 (MIT)
 
 Origem: jshttp/media-typer
 
 ```
 (The MIT License)
 
-Copyright (c) 2014 Douglas Christopher Wilson
+Copyright (c) 2014-2017 Douglas Christopher Wilson
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -2018,95 +2008,25 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### merge-descriptors@1.0.3 (MIT)
+### merge-descriptors@2.0.0 (MIT)
 
 Origem: sindresorhus/merge-descriptors
 
 ```
-(The MIT License)
+MIT License
 
-Copyright (c) 2013 Jonathan Ong <me@jongleberry.com>
-Copyright (c) 2015 Douglas Christopher Wilson <doug@somethingdoug.com>
+Copyright (c) Jonathan Ong <me@jongleberry.com>
+Copyright (c) Douglas Christopher Wilson <doug@somethingdoug.com>
+Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
 
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-'Software'), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### methods@1.1.2 (MIT)
-
-Origem: jshttp/methods
-
-```
-(The MIT License)
-
-Copyright (c) 2013-2014 TJ Holowaychuk <tj@vision-media.ca>
-Copyright (c) 2015-2016 Douglas Christopher Wilson <doug@somethingdoug.com>
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-'Software'), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
-### mime@1.6.0 (MIT)
-
-Origem: https://github.com/broofa/node-mime
-
-```
-The MIT License (MIT)
-
-Copyright (c) 2010 Benjamin Thomas, Robert Kieffer
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-```
-
-### mime-db@1.52.0 (MIT)
+### mime-db@1.54.0 (MIT)
 
 Origem: jshttp/mime-db
 
@@ -2136,7 +2056,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### mime-types@2.1.35 (MIT)
+### mime-types@3.0.2 (MIT)
 
 Origem: jshttp/mime-types
 
@@ -2191,34 +2111,6 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### ms@2.0.0 (MIT)
-
-Origem: zeit/ms
-
-```
-The MIT License (MIT)
-
-Copyright (c) 2016 Zeit, Inc.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
 ### ms@2.1.3 (MIT)
 
 Origem: vercel/ms
@@ -2253,7 +2145,7 @@ Origem: git://github.com/mikolalysenko/murmurhash-js.git
 
 Licença MIT; o pacote não traz o texto completo.
 
-### negotiator@0.6.3 (MIT)
+### negotiator@1.1.0 (MIT)
 
 Origem: jshttp/negotiator
 
@@ -2312,7 +2204,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### on-finished@2.4.1 (MIT)
+### on-finished@2.4.2 (MIT)
 
 Origem: jshttp/on-finished
 
@@ -2340,6 +2232,28 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### once@1.4.0 (ISC)
+
+Origem: git://github.com/isaacs/once
+
+```
+The ISC License
+
+Copyright (c) Isaac Z. Schlueter and Contributors
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
 ### parseurl@1.3.3 (MIT)
@@ -2372,7 +2286,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### path-to-regexp@0.1.13 (MIT)
+### path-to-regexp@8.4.2 (MIT)
 
 Origem: https://github.com/pillarjs/path-to-regexp.git
 
@@ -2513,7 +2427,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### qs@6.16.0 (BSD-3-Clause)
+### qs@6.16.1 (BSD-3-Clause)
 
 Origem: https://github.com/ljharb/qs.git
 
@@ -2571,7 +2485,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ```
 
-### range-parser@1.2.1 (MIT)
+### range-parser@1.3.0 (MIT)
 
 Origem: jshttp/range-parser
 
@@ -2601,7 +2515,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### raw-body@2.5.3 (MIT)
+### raw-body@3.0.2 (MIT)
 
 Origem: stream-utils/raw-body
 
@@ -2686,32 +2600,34 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### safe-buffer@5.2.1 (MIT)
+### router@2.2.0 (MIT)
 
-Origem: git://github.com/feross/safe-buffer.git
+Origem: pillarjs/router
 
 ```
-The MIT License (MIT)
+(The MIT License)
 
-Copyright (c) Feross Aboukhadijeh
+Copyright (c) 2013 Roman Shtylman
+Copyright (c) 2014-2022 Douglas Christopher Wilson
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+'Software'), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 ### safer-buffer@2.1.2 (MIT)
@@ -2742,7 +2658,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### send@0.19.2 (MIT)
+### send@1.2.1 (MIT)
 
 Origem: pillarjs/send
 
@@ -2772,7 +2688,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### serve-static@1.16.3 (MIT)
+### serve-static@2.2.1 (MIT)
 
 Origem: expressjs/serve-static
 
@@ -3043,7 +2959,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### type-is@1.6.18 (MIT)
+### type-is@2.1.0 (MIT)
 
 Origem: jshttp/type-is
 
@@ -3102,33 +3018,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### utils-merge@1.0.1 (MIT)
-
-Origem: git://github.com/jaredhanson/utils-merge.git
-
-```
-The MIT License (MIT)
-
-Copyright (c) 2013-2017 Jared Hanson
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
 ### vary@1.1.2 (MIT)
 
 Origem: jshttp/vary
@@ -3156,6 +3045,28 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### wrappy@1.0.2 (ISC)
+
+Origem: https://github.com/npm/wrappy
+
+```
+The ISC License
+
+Copyright (c) Isaac Z. Schlueter and Contributors
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
 ### ws@8.22.0 (MIT)

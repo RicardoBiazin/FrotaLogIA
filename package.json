@@ -1,6 +1,6 @@
 {
   "name": "frotalogia",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "Logística de transporte em tempo real, por cliente: veículos, viagens, centros de distribuição e estoque nas prateleiras.",
   "author": "Ricardo Biazin",
   "license": "UNLICENSED",
@@ -19,8 +19,8 @@
     "dados-teste": "node scripts/dados-teste.js"
   },
   "dependencies": {
-    "express": "^4.21.2",
-    "maplibre-gl": "^6.12.0",
+    "express": "^5.3.0",
+    "maplibre-gl": "^6.15.0",
     "three": "^0.186.1",
     "ws": "^8.18.0"
   }
