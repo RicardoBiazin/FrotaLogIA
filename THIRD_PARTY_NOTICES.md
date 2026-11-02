@@ -15,7 +15,7 @@ Gerado por `npm run licencas`. Não edite à mão.
 | @maplibre/geojson-vt | 6.3.0 | ISC |
 | @maplibre/maplibre-gl-style-spec | 26.4.4 | ISC |
 | @maplibre/mlt | 1.3.0 | (MIT OR Apache-2.0) |
-| @maplibre/vt-pbf | 4.3.2 | MIT |
+| @maplibre/vt-pbf | 4.3.3 | MIT |
 | @types/geojson | 7946.0.16 | MIT |
 | accepts | 2.0.0 | MIT |
 | bidi-js | 1.1.0 | MIT |
@@ -56,7 +56,7 @@ Gerado por `npm run licencas`. Não edite à mão.
 | is-promise | 4.0.0 | MIT |
 | json-stringify-pretty-compact | 4.0.0 | MIT |
 | kdbush | 4.1.0 | ISC |
-| maplibre-gl | 6.15.0 | BSD-3-Clause |
+| maplibre-gl | 6.16.0 | BSD-3-Clause |
 | math-intrinsics | 1.1.0 | MIT |
 | media-typer | 1.1.1 | MIT |
 | merge-descriptors | 2.0.0 | MIT |
@@ -91,14 +91,14 @@ Gerado por `npm run licencas`. Não edite à mão.
 | side-channel-map | 1.0.1 | MIT |
 | side-channel-weakmap | 1.0.2 | MIT |
 | statuses | 2.0.2 | MIT |
-| three | 0.186.1 | MIT |
+| three | 0.187.0 | MIT |
 | tinyqueue | 3.0.0 | ISC |
 | toidentifier | 1.0.1 | MIT |
 | type-is | 2.1.0 | MIT |
 | unpipe | 1.0.0 | MIT |
 | vary | 1.1.2 | MIT |
 | wrappy | 1.0.2 | ISC |
-| ws | 8.22.0 | MIT |
+| ws | 8.22.1 | MIT |
 
 ## Serviços e dados externos
 
@@ -649,7 +649,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-### @maplibre/vt-pbf@4.3.2 (MIT)
+### @maplibre/vt-pbf@4.3.3 (MIT)
 
 Origem: https://github.com/maplibre/vt-pbf
 
@@ -1828,7 +1828,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ```
 
-### maplibre-gl@6.15.0 (BSD-3-Clause)
+### maplibre-gl@6.16.0 (BSD-3-Clause)
 
 Origem: https://github.com/maplibre/maplibre-gl-js
 
@@ -2881,7 +2881,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### three@0.186.1 (MIT)
+### three@0.187.0 (MIT)
 
 Origem: https://github.com/mrdoob/three.js
 
@@ -3069,7 +3069,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
 IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### ws@8.22.0 (MIT)
+### ws@8.22.1 (MIT)
 
 Origem: git+https://github.com/websockets/ws.git
 

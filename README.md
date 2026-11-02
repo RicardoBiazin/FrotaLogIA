@@ -22,7 +22,7 @@ Logística de transporte em tempo real, **por cliente**: cada empresa vê a pró
 
 ## Começando
 
-Requisitos: **Node.js 20.12 ou superior**.
+Requisitos: **Node.js 22 ou superior** (o 20 está sem suporte desde abril de 2026).
 
 ### No Windows: `FrotaLogIA.bat`
 

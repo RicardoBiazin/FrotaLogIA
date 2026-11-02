@@ -183,9 +183,9 @@ if errorlevel 1 (
   echo  e abra este arquivo de novo.
   exit /b 1
 )
-node -e "const [a,b]=process.versions.node.split('.').map(Number);process.exit(a>20||(a===20&&b>=12)?0:1)"
+node -e "const [a,b]=process.versions.node.split('.').map(Number);process.exit(a>=22?0:1)"
 if errorlevel 1 (
-  for /f %%v in ('node -v') do echo  Node.js %%v e antigo demais. O FrotaLogIA precisa da versao 20.12 ou superior.
+  for /f %%v in ('node -v') do echo  Node.js %%v e antigo demais. O FrotaLogIA precisa da versao 22 ou superior.
   exit /b 1
 )
 exit /b 0

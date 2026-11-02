@@ -28,7 +28,7 @@ npm run device  # simula um dispositivo externo enviando posições por HTTP
 
 No Windows, `FrotaLogIA.bat` faz tudo por menu (aceita a opção como argumento: `FrotaLogIA.bat 4`; `NO_BROWSER=1` não abre o navegador). Ele **precisa de CRLF** (`.gitattributes`); `chcp`, `npm` e `node` rodam com `<nul`, senão engolem a resposta digitada no `set /p` seguinte; checagens de saúde usam `127.0.0.1`, porque `localhost` tenta antes o IPv6 e estoura o tempo. Mexeu no `.bat`: teste as opções com entrada redirecionada de arquivo.
 
-Node >= 20.12. **Não adicione dependências nativas** (precisam compilar no Windows).
+Node >= 22 (o 20 saiu de suporte em abril de 2026). **Não adicione dependências nativas** (precisam compilar no Windows).
 
 **Licença: proprietária** (`LICENSE`, © Ricardo Biazin; o produto será vendido). Só entram dependências com licença permissiva (MIT, ISC, BSD, Apache-2.0); nada de GPL, AGPL, LGPL, MPL ou SSPL, nem código copiado de projetos com essas licenças. Ao adicionar ou atualizar dependência, rode `npm run licencas` e commite o `THIRD_PARTY_NOTICES.md` (o teste `test/licencas.test.js` cobra os dois). Serviço externo novo (mapa, rotas, fontes) também entra lá, com os termos de uso comercial. Frontend sem bundler: módulos ES servidos direto de `public/`.
 
