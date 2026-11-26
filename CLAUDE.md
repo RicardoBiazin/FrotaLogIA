@@ -30,7 +30,7 @@ No Windows, `FrotaLogIA.bat` faz tudo por menu (aceita a opção como argumento:
 
 Node >= 22 (o 20 saiu de suporte em abril de 2026). **Não adicione dependências nativas** (precisam compilar no Windows).
 
-**Licença: proprietária** (`LICENSE`, © Ricardo Biazin; o produto será vendido). Só entram dependências com licença permissiva (MIT, ISC, BSD, Apache-2.0); nada de GPL, AGPL, LGPL, MPL ou SSPL, nem código copiado de projetos com essas licenças. Ao adicionar ou atualizar dependência, rode `npm run licencas` e commite o `THIRD_PARTY_NOTICES.md` (o teste `test/licencas.test.js` cobra os dois). Serviço externo novo (mapa, rotas, fontes) também entra lá, com os termos de uso comercial. Frontend sem bundler: módulos ES servidos direto de `public/`.
+**Licença: MIT** (`LICENSE`, © Ricardo Biazin; repo público; mudou de proprietária para MIT na 0.10.2). Só entram dependências com licença permissiva (MIT, ISC, BSD, Apache-2.0); nada de GPL, AGPL, LGPL, MPL ou SSPL, nem código copiado de projetos com essas licenças. Ao adicionar ou atualizar dependência, rode `npm run licencas` e commite o `THIRD_PARTY_NOTICES.md` (o teste `test/licencas.test.js` cobra os dois). Serviço externo novo (mapa, rotas, fontes) também entra lá, com os termos de uso comercial. Frontend sem bundler: módulos ES servidos direto de `public/`.
 
 ## Arquitetura (fluxo de dados)
 

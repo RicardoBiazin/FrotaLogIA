@@ -1,5 +1,5 @@
 // Licenças das dependências: gera THIRD_PARTY_NOTICES.md e confere se todas permitem
-// uso comercial em produto fechado. O FrotaLogIA é proprietário (ver LICENSE), então
+// uso comercial. O FrotaLogIA é MIT (ver LICENSE), então
 // dependência copyleft (GPL, AGPL, LGPL, MPL, SSPL...) não pode entrar sem análise.
 //
 // Uso:
@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const NOTICES_FILE = path.join(ROOT, 'THIRD_PARTY_NOTICES.md');
 
-// Permissivas: permitem vender produto fechado; exigem manter o aviso de copyright.
+// Permissivas: compatíveis com a MIT; exigem manter o aviso de copyright.
 export const PERMITIDAS = new Set([
   'MIT', 'ISC', 'BSD-2-Clause', 'BSD-3-Clause', 'Apache-2.0', '0BSD', '(MIT OR Apache-2.0)',
 ]);
@@ -51,7 +51,7 @@ export function renderNotices(deps) {
   const lines = [
     '# Avisos de terceiros',
     '',
-    'O FrotaLogIA é software proprietário (ver `LICENSE`). Ele usa os componentes abaixo,',
+    'O FrotaLogIA é licenciado sob a MIT (ver `LICENSE`). Ele usa os componentes abaixo,',
     'cada um sob a licença do seu autor. Todas são permissivas e exigem manter este aviso.',
     '',
     'Gerado por `npm run licencas`. Não edite à mão.',

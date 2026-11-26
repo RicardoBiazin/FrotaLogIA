@@ -268,6 +268,6 @@ O roadmap, com as prioridades, está no `CLAUDE.md`.
 
 ## Licença
 
-**Software proprietário. © 2026 Ricardo Biazin. Todos os direitos reservados** (ver `LICENSE`). Usar, copiar, distribuir ou oferecer como serviço depende de autorização por escrito.
+**Licença MIT. © 2026 Ricardo Biazin** (ver `LICENSE`). Pode usar, copiar, modificar, distribuir e vender, mantendo o aviso de copyright.
 
-As dependências usam licenças permissivas (MIT, ISC, BSD e Apache-2.0), que permitem a venda em produto fechado desde que os avisos sejam mantidos. Os avisos estão em `THIRD_PARTY_NOTICES.md`, gerado por `npm run licencas`. O `npm test` falha se entrar uma dependência copyleft (GPL, AGPL, LGPL...) ou se os avisos ficarem desatualizados.
+As dependências usam licenças permissivas (MIT, ISC, BSD e Apache-2.0), compatíveis com a MIT, desde que os avisos sejam mantidos. Os avisos estão em `THIRD_PARTY_NOTICES.md`, gerado por `npm run licencas`. O `npm test` falha se entrar uma dependência copyleft (GPL, AGPL, LGPL...) ou se os avisos ficarem desatualizados.

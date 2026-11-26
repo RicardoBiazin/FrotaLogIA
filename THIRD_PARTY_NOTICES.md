@@ -1,6 +1,6 @@
 # Avisos de terceiros
 
-O FrotaLogIA é software proprietário (ver `LICENSE`). Ele usa os componentes abaixo,
+O FrotaLogIA é licenciado sob a MIT (ver `LICENSE`). Ele usa os componentes abaixo,
 cada um sob a licença do seu autor. Todas são permissivas e exigem manter este aviso.
 
 Gerado por `npm run licencas`. Não edite à mão.

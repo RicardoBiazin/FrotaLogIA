@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { listDependencies, checkLicenses, renderNotices, NOTICES_FILE } from '../scripts/licencas.js';
 
-// O FrotaLogIA é proprietário e será vendido: dependência copyleft não pode entrar sem análise.
+// O FrotaLogIA é MIT: dependência copyleft não pode entrar sem análise.
 test('todas as dependências têm licença permissiva', () => {
   assert.deepEqual(checkLicenses(listDependencies()), []);
 });

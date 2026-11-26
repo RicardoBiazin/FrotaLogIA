@@ -1,28 +1,21 @@
-FrotaLogIA
-Copyright (c) 2026 Ricardo Biazin. Todos os direitos reservados.
+MIT License
 
-Este software, incluindo o código-fonte, a documentação, o desenho da interface
-e os dados de exemplo (o "Software"), é propriedade exclusiva do titular acima e
-está protegido pela Lei nº 9.609/1998 (Lei do Software), pela Lei nº 9.610/1998
-(Lei de Direitos Autorais) e pelos tratados internacionais aplicáveis.
+Copyright (c) 2026 Ricardo Biazin
 
-Nenhuma licença é concedida por este arquivo. Sem autorização prévia e por escrito
-do titular, é proibido:
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-  1. usar, copiar, modificar, adaptar, traduzir ou criar obras derivadas do Software;
-  2. vender, sublicenciar, alugar, emprestar, distribuir, publicar ou disponibilizar
-     o Software a terceiros, inclusive como serviço (SaaS) ou hospedado;
-  3. fazer engenharia reversa, descompilar ou remover avisos de propriedade.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-O uso por clientes depende de contrato de licença ou de prestação de serviço
-firmado com o titular, nos termos e prazos ali definidos.
-
-O Software inclui componentes de terceiros distribuídos sob as licenças dos seus
-autores (MIT, ISC, BSD e Apache-2.0), listados em THIRD_PARTY_NOTICES.md. Essas
-licenças continuam valendo para os respectivos componentes e não se estendem ao
-restante do Software.
-
-O SOFTWARE É FORNECIDO "NO ESTADO EM QUE SE ENCONTRA", SEM GARANTIA DE QUALQUER
-ESPÉCIE, SALVO O QUE FOR PREVISTO EM CONTRATO ESCRITO COM O TITULAR.
-
-Contato para licenciamento: Ricardo Biazin.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
